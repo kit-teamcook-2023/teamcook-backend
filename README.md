@@ -45,7 +45,7 @@
 
 		2. 각 api 작성 후 docs 추가
 
-        3. firebase로 구글 로그인 테스트
+		3. firebase로 구글 로그인 테스트
 
 		4. 
 		
