@@ -179,8 +179,9 @@ def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
     
     firebase.push(uid=uid, type="nickname", data=nickname)
     firebase.push(uid=uid, type="ip", data=sql.getDomainFromAddress(address))
+    gasmeter = int(gasmeter)
     firebase.push(uid=uid, type="gas", data=['', gasmeter])
-    sql.appendNickname(nickname)
+    sql.appendNickname(nickname, uid)
     # DELETE FROM nicknames WHERE nickname='test10';
 
     firebase.create_user({
@@ -214,7 +215,7 @@ def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
           dependencies=[Depends(JWTBearer())],
           responses=res.delete_user()
         )
-async def deleteAccount(Authorization: Optional[str] = Header(None)):
+def deleteAccount(Authorization: Optional[str] = Header(None)):
     token = Authorization[7:]
     payload = decodeJWT(token)
 
@@ -289,7 +290,7 @@ def getPostAndComments(id:int):
           dependencies=[Depends(JWTBearer())],
          description="게시글 작성",
          responses=res.post_post())
-async def insertPostToMySQL(writing: Writing, Authorization: Optional[str] = Header(None)):
+def insertPostToMySQL(writing: Writing, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
 
     # author = writing.author
@@ -380,8 +381,8 @@ def removeCommentFromMySQL(id:int , nickname: str, Authorization: Optional[str] 
 async def kakao_callback(request: Request, code: str):
     client_id = CLIENT_ID
     client_secret = CLIENT_SECRET
-    redirect_uri = "http://localhost:3000/auth/kakao/callback"
-    # redirect_uri = "http://34.215.66.235:8000/auth/kakao/callback"
+    redirect_uri = "15.165.65.93/auth/kakao/callback"
+    # redirect_uri = "http://localhost:3000/auth/kakao/callback"
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
     
