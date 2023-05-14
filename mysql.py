@@ -128,14 +128,20 @@ class MySQL():
         self._con.commit()
 
     def getSearchWritingsCount(self, type:str, data:str):
-        sql = f"""SELECT COUNT(*) FROM `writings` WHERE {type}='{data}'"""
+        if type == 'author':
+            sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}`='{data}'"""
+        else:
+            sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}` LIKE '%{data}%'"""
         self._cur.execute(sql)
         row = self._cur.fetchone()
 
         return {'row_count': row[0]}
 
     def searchWriting(self, type:str, data:str, page:int):
-        sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}` LIKE '%{data}%' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+        if type == 'author':
+            sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}`='{data}' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+        else:
+            sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}` LIKE '%{data}%' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
         self._cur.execute(sql)
         rows = self._cur.fetchall()
 
@@ -164,10 +170,17 @@ class MySQL():
             return True
         return False
 
-    def appendNickname(self, nickname:str):
-        sql = f"""INSERT INTO nicknames(`nickname`) VALUES ('{nickname}')"""
+    def appendNickname(self, nickname:str, uid:str):
+        sql = f"""INSERT INTO nicknames(`nickname`, `uid`) VALUES ('{nickname}', '{uid}')"""
         self._cur.execute(sql)
         self._con.commit()
+
+    def findUidUSENickname(self, nickname:str):
+        sql = f"""SELECT `uid` FROM nicknames WHERE `nickname`='{nickname}'"""
+        self._cur.execute(sql)
+        row = self._cur.fetchone()
+
+        return row[0]
 
     def getDomainFromAddress(self, address:str):
         sql = f"""SELECT domain FROM ips WHERE address='{address}'"""
