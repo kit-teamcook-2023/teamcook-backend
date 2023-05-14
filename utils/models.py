@@ -5,7 +5,7 @@ class UserSignUp(BaseModel):
     # uid: str
     nickname: str
     address: str
-    gasMeter: int
+    gasMeter: Optional[int] = None
     elecMeter: Optional[int] = None
 
 class Writing(BaseModel):
