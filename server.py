@@ -64,7 +64,8 @@ async def root(request: Request):
          dependencies=[Depends(JWTBearer())],
          description="사용자의 uid와 년도-달-일 을 이용하여 전기사용량, 가스사용량 획득",
          responses=res.get_user_fee())
-def get_gas_elec(date:str, Authorization: Optional[str] = Header(None)):
+# date:str, 
+def get_gas_elec(Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
     uid = payload['uid']
     today = datetime.today().strftime("%y-%m-%d-%H")
@@ -102,13 +103,13 @@ def get_gas_elec(date:str, Authorization: Optional[str] = Header(None)):
 
 def calc_fees(cur: dict, last: dict, rate:dict) -> dict:
     gas_diff = cur['gas'] - last['gas']
-    elec_diff = cur['elec'] - last['elec']
+    # elec_diff = cur['elec'] - last['elec']
 
-    elec_rates = list(rate['elec'].keys())
+    # elec_rates = list(rate['elec'].keys())
 
     ret = {
         'gas': calc_gas_fee(gas_diff, rate['gas']),
-        'elec': calc_elec_fee(elec_diff, elec_rates, rate['elec'])
+        # 'elec': calc_elec_fee(elec_diff, elec_rates, rate['elec'])
     }
 
     return ret
@@ -256,6 +257,7 @@ def searchPosts(type:str, data:str, page:int):
          description="전체 게시글 반환",
          responses=res.get_all_posts())
 def getAllPosts():
+    print(1)
     result = sql.getAllWritings()
     rows = sql.getWritingsCount()['row_count']
     ret = {
@@ -381,7 +383,7 @@ def removeCommentFromMySQL(id:int , nickname: str, Authorization: Optional[str] 
 async def kakao_callback(request: Request, code: str):
     client_id = CLIENT_ID
     client_secret = CLIENT_SECRET
-    redirect_uri = "15.165.65.93/auth/kakao/callback"
+    redirect_uri = "http://15.165.65.93/auth/kakao/callback"
     # redirect_uri = "http://localhost:3000/auth/kakao/callback"
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
