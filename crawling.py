@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup as bs
 import os
 from dotenv import load_dotenv
 
-from firebase import Firebase
+from database.firebase import Firebase
 from datetime import datetime
 import schedule
 import time
