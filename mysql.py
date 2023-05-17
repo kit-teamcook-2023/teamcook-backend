@@ -6,39 +6,66 @@ import datetime
 class MySQL():
     def __init__(self):
         load_dotenv(verbose=True)
+        self._connect_database()
+        
+    def __del__(self):
+        self._con.close()
+
+    def _connect_database(self):
+        try:
+            self._con.close()
+        except:
+            None
+            
         self._con = sql.connect(
-            host='localhost', 
-            user=os.getenv("MYSQL_ID"), 
-            password=os.getenv("MYSQL_PW"), 
-            db=os.getenv("MYSQL_DB"), 
-            charset='utf8mb4'
+                host='localhost', 
+                user=os.getenv("MYSQL_ID"), 
+                password=os.getenv("MYSQL_PW"), 
+                db=os.getenv("MYSQL_DB"), 
+                charset='utf8mb4'
             )
-        self._cur = self._con.cursor()
+        
+    # 모든 sql 쿼리 함수에 @healthcheck 데코레이터 사용 예정
+    def healthcheck(func):
+        def wrapper(self, *args, **kwargs):
+            try:
+                self._con.ping()
+            except sql.OperationalError as e:
+                if e.args[0] == 2006:
+                    self._connect_database()
+            return func(self, *args, **kwargs)
+        return wrapper
 
+    @healthcheck
     def appendWriting(self, title:str, content:str, author:str):
-        sql = f"""INSERT INTO `writings`(`title`, `content`, `author`) VALUES('{title}', '{content}', '{author}')"""
-        self._cur.execute(sql)
-        self._con.commit()
+        with self._con.cursor() as cur:
+            sql = f"""INSERT INTO `writings`(`title`, `content`, `author`) VALUES('{title}', '{content}', '{author}')"""
+            cur.execute(sql)
+            self._con.commit()
 
-        #테스트용에서만 작동
-        sql = f"""SELECT `date` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' ORDER BY `date` DESC"""
-        self._cur.execute(sql)
+            #테스트용에서만 작동
+            sql = f"""SELECT `date` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' ORDER BY `date` DESC"""
+            cur.execute(sql)
 
-        row = self._cur.fetchone()
+            row = cur.fetchone()
         return row[0].strftime("%y-%m-%d %H:%M:%S")
 
     
     # frontend 메타데이터에 writing_id를 가지고 있으면 편함
+    @healthcheck
     def appendComment(self, title, comment, author, parent_writing):
-        sql = f"""INSERT INTO `comments`(`writing_id`, `content`, `author`) VALUES({parent_writing}, '{comment}', '{author}')"""
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            sql = f"""INSERT INTO `comments`(`writing_id`, `content`, `author`) VALUES({parent_writing}, '{comment}', '{author}')"""
+            cur.execute(sql)
         self._con.commit()
 
+    @healthcheck
     def getAllWritings(self):
-        sql = f"""SELECT `id`, `title`, `author`, `date` FROM `writings`"""
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            sql = f"""SELECT `id`, `title`, `author`, `date` FROM `writings`"""
+            cur.execute(sql)
 
-        rows = self._cur.fetchall()
+            rows = cur.fetchall()
 
         ret = []
         for row in rows:
@@ -50,7 +77,8 @@ class MySQL():
             })
         
         return ret
-
+        
+    @healthcheck
     def getWriting(self, title:str=None, author:str=None, time:str=None, id:int=None):
         if id == None:
             sql = f"""SELECT `title`, `content`, `author`, `date`, `id` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
@@ -58,9 +86,10 @@ class MySQL():
             sql = f"""SELECT `title`, `content`, `author`, `date`, `id` FROM `writings` WHERE `id`='{id}'"""
         
         
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            cur.execute(sql)
 
-        row = self._cur.fetchone()
+            row = cur._cur.fetchone()
 
         try:
             ret = {
@@ -76,17 +105,21 @@ class MySQL():
             ret = {}
         return ret
 
+    @healthcheck
     def getWritingsCount(self):
-        sql = f"""SELECT COUNT(*) FROM `writings`"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT COUNT(*) FROM `writings`"""
+            cur.execute(sql)
+            row = cur.fetchone()
 
         return {'row_count': row[0]}
 
+    @healthcheck
     def getComments(self, parent_id):
-        sql = f"""SELECT `content`, `author`, `date`, `id` FROM comments WHERE `writing_id`='{parent_id}'"""
-        self._cur.execute(sql)
-        rows = self._cur.fetchall()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT `content`, `author`, `date`, `id` FROM comments WHERE `writing_id`='{parent_id}'"""
+            cur.execute(sql)
+            rows = cur.fetchall()
 
         ret = []
         for row in rows:
@@ -99,51 +132,63 @@ class MySQL():
 
         return ret
 
+    @healthcheck
     def getLastPost(self, author: str) -> int:
-        sql = f"""SELECT `id` FROM `writings` WHERE `author`='{author}' ORDER BY `date` DESC LIMIT 1"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT `id` FROM `writings` WHERE `author`='{author}' ORDER BY `date` DESC LIMIT 1"""
+            cur.execute(sql)
+            row = cur.fetchone()
         return int(row[0])
 
+    @healthcheck
     def getLastComment(self, author: str) -> int:
-        sql = f"""SELECT `id` FROM `comments` WHERE `author`='{author}' ORDER BY `date` DESC LIMIT 1"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT `id` FROM `comments` WHERE `author`='{author}' ORDER BY `date` DESC LIMIT 1"""
+            cur.execute(sql)
+            row = cur.fetchone()
         return int(row[0])
-        
+
+    @healthcheck
     def deleteWriting(self, id:int):
         # 글 삭제 시 해당 글의 댓글까지 모두 삭제. CASCADE 작동하지 않을 경우 아래의 코드 수행
         # CASCADE 정상 작동 확인. 아래 코드 필요 없음
         # sql = f"""DELETE FROM `comments` WHERE `writing_id`='{id}'"""
         # self._cur.execute(sql)
 
-        sql = f"""DELETE FROM `writings` WHERE `id`='{id}'"""
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            sql = f"""DELETE FROM `writings` WHERE `id`='{id}'"""
+            cur.execute(sql)
         self._con.commit()
 
     # frontend에서 메타데이터로 댓글 id 저장?
+    @healthcheck
     def deleteComment(self, id:int):
-        sql = f"""DELETE FROM `comments` WHERE `id`='{id}'"""
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            sql = f"""DELETE FROM `comments` WHERE `id`='{id}'"""
+            cur.execute(sql)
         self._con.commit()
 
+    @healthcheck
     def getSearchWritingsCount(self, type:str, data:str):
-        if type == 'author':
-            sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}`='{data}'"""
-        else:
-            sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}` LIKE '%{data}%'"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            if type == 'author':
+                sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}`='{data}'"""
+            else:
+                sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}` LIKE '%{data}%'"""
+            cur.execute(sql)
+            row = cur.fetchone()
 
         return {'row_count': row[0]}
 
+    @healthcheck
     def searchWriting(self, type:str, data:str, page:int):
-        if type == 'author':
-            sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}`='{data}' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
-        else:
-            sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}` LIKE '%{data}%' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
-        self._cur.execute(sql)
-        rows = self._cur.fetchall()
+        with self._con.cursor as cur:
+            if type == 'author':
+                sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}`='{data}' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+            else:
+                sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}` LIKE '%{data}%' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+            cur.execute(sql)
+            rows = cur.fetchall()
 
         ret = []
         for row in rows:
@@ -156,38 +201,49 @@ class MySQL():
 
         return ret
 
+    @healthcheck
     def deleteUser(self, nickname:str):
-        sql = f"""DELETE FROM nicknames WHERE `nickname`='{nickname}'"""
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            sql = f"""DELETE FROM nicknames WHERE `nickname`='{nickname}'"""
+            cur.execute(sql)
         self._con.commit()
 
+    @healthcheck
     def searchNickname(self, nickname:str):
-        sql = f"""SELECT COUNT(*) FROM `nicknames` WHERE `nickname`='{nickname}'"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT COUNT(*) FROM `nicknames` WHERE `nickname`='{nickname}'"""
+            cur.execute(sql)
+            row = cur.fetchone()
 
         if row[0] == 1:
             return True
         return False
 
+    @healthcheck
     def appendNickname(self, nickname:str, uid:str):
-        sql = f"""INSERT INTO nicknames(`nickname`, `uid`) VALUES ('{nickname}', '{uid}')"""
-        self._cur.execute(sql)
+        with self._con.cursor() as cur:
+            sql = f"""INSERT INTO nicknames(`nickname`, `uid`) VALUES ('{nickname}', '{uid}')"""
+            cur.execute(sql)
         self._con.commit()
 
+    @healthcheck
     def findUidUSENickname(self, nickname:str):
-        sql = f"""SELECT `uid` FROM nicknames WHERE `nickname`='{nickname}'"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT `uid` FROM nicknames WHERE `nickname`='{nickname}'"""
+            cur.execute(sql)
+            row = cur.fetchone()
 
         return row[0]
 
+    @healthcheck
     def getDomainFromAddress(self, address:str):
-        sql = f"""SELECT domain FROM ips WHERE address='{address}'"""
-        self._cur.execute(sql)
-        row = self._cur.fetchone()
+        with self._con.cursor() as cur:
+            sql = f"""SELECT domain FROM ips WHERE address='{address}'"""
+            cur.execute(sql)
+            row = cur.fetchone()
         return row[0]
 
+    @healthcheck
     def clearDatabase(self):
         with self._con.cursor() as cursor:
             cursor.execute("DROP DATABASE IF EXISTS writing_table")
