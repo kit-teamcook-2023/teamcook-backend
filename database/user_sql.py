@@ -202,9 +202,9 @@ class UserSQL():
         return ret
 
     @healthcheck
-    def deleteUser(self, nickname:str):
+    def deleteUser(self, uid:str):
         with self._con.cursor() as cur:
-            sql = f"""DELETE FROM nicknames WHERE `nickname`='{nickname}'"""
+            sql = f"""DELETE FROM nicknames WHERE `uid`='{uid}'"""
             cur.execute(sql)
         self._con.commit()
 
