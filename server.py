@@ -70,7 +70,7 @@ def get_gas_elec(Authorization: Optional[str] = Header(None)):
     uid = payload['uid']
     today = datetime.today().strftime("%y-%m-%d-%H")
     date = today
-    print(date)
+    # print(date)
     # today = date
 
     # 시작일 알려줌
@@ -244,7 +244,7 @@ def deleteAccount(Authorization: Optional[str] = Header(None)):
          responses=res.search_posts())
 # responce 추가 필요
 def searchPosts(type:str, data:str, page:int):
-    print(type, data, page)
+    # print(type, data, page)
     count = sql.getSearchWritingsCount(type, data)
     posts = sql.searchWriting(type, data, page)
     ret = {
@@ -257,7 +257,6 @@ def searchPosts(type:str, data:str, page:int):
          description="전체 게시글 반환",
          responses=res.get_all_posts())
 def getAllPosts():
-    print(1)
     result = sql.getAllWritings()
     rows = sql.getWritingsCount()['row_count']
     ret = {
@@ -408,7 +407,7 @@ async def kakao_callback(request: Request, code: str):
     # user_info에 있는 uid값은 int형이었다..!
     uid = str(user_info.get("id"))
     res_code, nickname = firebase.get_user_kakao(uid)
-    print(res_code)
+    # print(res_code)
     if res_code == True:
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content=signJWT(nickname, uid, 30 * 24 * 60 * 60))
     else:
