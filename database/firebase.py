@@ -111,6 +111,8 @@ class Firebase:
         elec_ref = data_ref.child('elec')
         elec_ref.delete()
 
+        auth.delete_user(uid)
+
     # search data witch front-end want
     def search(self, uid, month):
         data_ref = db.reference(uid)
