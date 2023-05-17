@@ -1,13 +1,15 @@
 # firebase 데이터베이스에 접근하기 위한 클래스
-from firebase import Firebase
+from database.firebase import Firebase
 
 # 게시판 데이터베이스에 접근하기 위한 클래스
-from mysql import MySQL
+from database.user_sql import UserSQL
+from database.chat_sql import ChatSQL
 
 # 서버 구축을 위한 fastapi
-from fastapi import FastAPI, Depends, Header, status, Request
+from fastapi import FastAPI, Depends, Header, status, Request, WebSocket, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.websockets import WebSocketState
 from typing import Optional
 # from pydantic import BaseModel
 
@@ -16,6 +18,7 @@ from dateutil.relativedelta import relativedelta
 import httpx
 import os
 from dotenv import load_dotenv
+import json
 
 from utils.responces import Responces
 from utils.models import UserSignUp, Writing, Clearfirebase, Comment
@@ -27,8 +30,9 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 
 app = FastAPI()
-firebase = Firebase()
-sql = MySQL()
+firebase = Firebase() # credential은 호출하는 파일의 디렉터리에 있어야한다!
+sql_user = UserSQL()
+sql_chat = ChatSQL()
 res = Responces()
 
 origins = [
@@ -56,6 +60,25 @@ app.add_middleware(
          status_code=status.HTTP_200_OK)
 async def root(request: Request):
     return {"title": "hello world"}
+
+# params로 fee 받아옴
+@app.post("/gas-fee/{uid}")
+async def get_gas_fee(uid: str, file: UploadFile = File(...)):
+    content = await file.read()
+    uid = uid.strip()
+    data = json.loads(content.decode('utf-8'))
+    print(data)
+    gas_meter = data['gas']
+    firebase.push(uid, "gas", gas_meter)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
+
+# @app.get("/test-for-pi", tags=["test"])
+# async def testing():
+#     async with httpx.AsyncClient() as client:
+#         response = await client.get("http://choijungwoo.iptime.org:5000/ocr", data={
+
+#         })
+#     None
 
 # get? post?
 # front와 협의 필요
@@ -154,7 +177,7 @@ def calc_gas_fee(diff: int, rate: int) -> int:
          description="유저 닉네임이 사용중인지 확인",
          responses=res.check_nickname_usage())
 def is_user_in(nickname: str):
-    if sql.searchNickname(nickname) == True:
+    if sql_user.searchNickname(nickname) == True:
         return JSONResponse(status_code=status.HTTP_226_IM_USED)
     else:
         return JSONResponse(status_code=status.HTTP_200_OK)
@@ -175,14 +198,14 @@ def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
 
     payload = decodeJWT(Authorization[7:])
     uid = payload['uid']
-    if sql.searchNickname(nickname):
+    if sql_user.searchNickname(nickname):
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content={"signup": "ignored"})
     
     firebase.push(uid=uid, type="nickname", data=nickname)
-    firebase.push(uid=uid, type="ip", data=sql.getDomainFromAddress(address))
+    firebase.push(uid=uid, type="ip", data=sql_user.getDomainFromAddress(address))
     gasmeter = int(gasmeter)
     firebase.push(uid=uid, type="gas", data=['', gasmeter])
-    sql.appendNickname(nickname, uid)
+    sql_user.appendNickname(nickname, uid)
     # DELETE FROM nicknames WHERE nickname='test10';
 
     firebase.create_user({
@@ -223,10 +246,10 @@ def deleteAccount(Authorization: Optional[str] = Header(None)):
     res = firebase.delete_user(payload['uid'])
     nickname = payload['nickname']
     try:
-        sql.deleteUser(nickname)
+        sql_user.deleteUser(nickname)
     except:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
-            'status': 'already deleted - sql'
+            'status': 'already deleted - sql_user'
         })
     if res:
         return JSONResponse(status_code=status.HTTP_200_OK, content={
@@ -245,8 +268,8 @@ def deleteAccount(Authorization: Optional[str] = Header(None)):
 # responce 추가 필요
 def searchPosts(type:str, data:str, page:int):
     # print(type, data, page)
-    count = sql.getSearchWritingsCount(type, data)
-    posts = sql.searchWriting(type, data, page)
+    count = sql_user.getSearchWritingsCount(type, data)
+    posts = sql_user.searchWriting(type, data, page)
     ret = {
         'post_counts': count['row_count'],
         'posts': posts
@@ -257,8 +280,8 @@ def searchPosts(type:str, data:str, page:int):
          description="전체 게시글 반환",
          responses=res.get_all_posts())
 def getAllPosts():
-    result = sql.getAllWritings()
-    rows = sql.getWritingsCount()['row_count']
+    result = sql_user.getAllWritings()
+    rows = sql_user.getWritingsCount()['row_count']
     ret = {
         'counts': rows,
         'posts': result
@@ -270,7 +293,7 @@ def getAllPosts():
          responses=res.get_post())
 def getPostAndComments(id:int):
     ret = {}
-    result = sql.getWriting(id=id)
+    result = sql_user.getWriting(id=id)
     try:
         ret['writing'] = result['write']
     except:
@@ -280,7 +303,7 @@ def getPostAndComments(id:int):
         # ret['writing'] = {}
 
     try:
-        result = sql.getComments(id)
+        result = sql_user.getComments(id)
         ret['comments'] = result
     except:
         ret['comments'] = {}
@@ -291,7 +314,7 @@ def getPostAndComments(id:int):
           dependencies=[Depends(JWTBearer())],
          description="게시글 작성",
          responses=res.post_post())
-def insertPostToMySQL(writing: Writing, Authorization: Optional[str] = Header(None)):
+def insertPostToMysql_user(writing: Writing, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
 
     # author = writing.author
@@ -299,8 +322,8 @@ def insertPostToMySQL(writing: Writing, Authorization: Optional[str] = Header(No
     title = writing.title
     content = writing.content
     try:
-        sql.appendWriting(title,content,author)
-        id = sql.getLastPost(author)
+        sql_user.appendWriting(title,content,author)
+        id = sql_user.getLastPost(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
             "id": id,
             "status": "Post post successed"
@@ -313,7 +336,7 @@ def insertPostToMySQL(writing: Writing, Authorization: Optional[str] = Header(No
 @app.post("/comment", tags=["게시판"],
          description="댓글 작성",
          responses=res.post_comment())
-def insertCommentToMySQL(comment: Comment, Authorization: Optional[str] = Header(None)):
+def insertCommentToMysql_user(comment: Comment, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
     author = payload['nickname']
     content = comment.content
@@ -321,8 +344,8 @@ def insertCommentToMySQL(comment: Comment, Authorization: Optional[str] = Header
     title = "" # 미래에 사용할 수도 있음
 
     try:
-        sql.appendComment(title, content, author, post_id)
-        comment_id = sql.getLastComment(author)
+        sql_user.appendComment(title, content, author, post_id)
+        comment_id = sql_user.getLastComment(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
             "comment_id": comment_id,
             "post_id": post_id,
@@ -338,7 +361,7 @@ def insertCommentToMySQL(comment: Comment, Authorization: Optional[str] = Header
         dependencies=[Depends(JWTBearer())],
          description="글 삭제",
          responses=res.delete("post"))
-def removePostFromMySQL(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
+def removePostFromMysql_user(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
     # if payload['nickname'] != element.nickname:
     if payload['nickname'] != nickname:
@@ -347,7 +370,7 @@ def removePostFromMySQL(id:int , nickname: str, Authorization: Optional[str] = H
         })
     
     try:
-        sql.deleteWriting(id)
+        sql_user.deleteWriting(id)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
             "status": "Remove post successed"
         })
@@ -360,7 +383,7 @@ def removePostFromMySQL(id:int , nickname: str, Authorization: Optional[str] = H
          description="댓글 삭제",
          dependencies=[Depends(JWTBearer())],
          responses=res.delete("comment"))
-def removeCommentFromMySQL(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
+def removeCommentFromMysql_user(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
     payload = Authorization[7:]
     if payload['nickname'] != nickname:
         return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
@@ -368,7 +391,7 @@ def removeCommentFromMySQL(id:int , nickname: str, Authorization: Optional[str] 
         })
     
     try:
-        sql.deleteComment(id)
+        sql_user.deleteComment(id)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
             "status": "Remove comment successed"
         })
@@ -448,8 +471,8 @@ async def test(uid):
 
 @app.put('/test', tags=["test"])
 def clearfirebase(cls:Clearfirebase):
-    if cls.isAdmin == "if MySQLRemoveAcceepted == IsAdmin then Do_Reset_Database":
-        sql.clearDatabase()
+    if cls.isAdmin == "if Mysql_userRemoveAcceepted == IsAdmin then Do_Reset_Database":
+        sql_user.clearDatabase()
         return status.HTTP_200_OK
     return status.HTTP_400_BAD_REQUEST
 
@@ -462,3 +485,64 @@ def test_kakao(uid:int):
     firebase.create_user(data)
 
     return firebase.get_user_kakao(str(uid))
+
+@app.get("/chatting/{chatting_room_id}/chat", tags=["chatting", "websocket"])
+def get_previous_chat(chatting_room_id: str):
+    return sql_chat.get_previous_chat(chatting_room_id)
+
+active_connections = {}
+# 채팅방에 입장하는 WebSocket 연결 처리
+@app.websocket("/chat/{uid1}-{uid2}")
+async def websocket_endpoint(uid1: str, uid2: str, websocket: WebSocket):
+    await websocket.accept()
+
+    # 채팅방 주소 생성
+    room_address = f"{uid1}-{uid2}"
+    if not sql_chat.room_exisits(room_address):
+        sql_chat.create_room(room_address)
+    print(room_address)
+
+    # 채팅방에 사용자 추가
+    add_user_to_chat_room(room_address, websocket)
+    print("append complete")
+
+    try:
+        while True:
+            # 클라이언트로부터 메시지 수신
+            data = await websocket.receive_text()
+
+            # 테스트로는 sender: data 형식으로 받아올 예정
+            human, data = map(str, data.replace(" ", "").split(":"))
+
+            # 메시지 전송
+            await send_message_to_chat_room(room_address, data, websocket)
+
+            # 메시지 백업
+            sql_chat.backup_message(room_address, data, human)
+
+    except Exception:
+        # WebSocket 연결이 종료되면 사용자를 채팅방에서 제거
+        remove_user_from_chat_room(room_address, websocket)
+        if websocket.client_state == WebSocketState.CONNECTED:
+            await websocket.close()
+
+
+# 채팅방에 사용자 추가
+def add_user_to_chat_room(room_address: str, websocket: WebSocket):
+    if room_address not in active_connections:
+        active_connections[room_address] = []
+    active_connections[room_address].append(websocket)
+
+
+# 채팅방에서 사용자 제거
+def remove_user_from_chat_room(room_address: str, websocket: WebSocket):
+    if room_address in active_connections:
+        active_connections[room_address].remove(websocket)
+
+
+# 채팅방에 메시지 전송
+async def send_message_to_chat_room(room_address: str, message: str, mysocket: WebSocket):
+    if room_address in active_connections:
+        for socket in active_connections[room_address]:
+            if socket is not mysocket:
+                await socket.send_text(message)
