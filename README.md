@@ -52,7 +52,7 @@
 
 		3. chatting_server를 어떻게 제대로 사용할 것인가? 고민중
 		
-        4. pymysql healthcheck 기눙 구현
+		4. pymysql healthcheck 기눙 구현
 
 	구현 해야 할 것
 
