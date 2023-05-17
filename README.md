@@ -52,6 +52,8 @@
 
 		3. chatting_server를 어떻게 제대로 사용할 것인가? 고민중
 		
+        4. pymysql healthcheck 기눙 구현
+
 	구현 해야 할 것
 
 		1. 회원가입 시 기기와 통신 - 라즈베리파이 필요
