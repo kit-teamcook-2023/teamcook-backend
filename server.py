@@ -88,7 +88,7 @@ async def get_gas_fee(uid: str, file: UploadFile = File(...)):
          description="사용자의 uid와 년도-달-일 을 이용하여 전기사용량, 가스사용량 획득",
          responses=res.get_user_fee())
 # date:str, 
-def get_gas_elec(Authorization: Optional[str] = Header(None)):
+async def get_gas_elec(Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
     uid = payload['uid']
     today = datetime.today().strftime("%y-%m-%d-%H")
@@ -106,6 +106,12 @@ def get_gas_elec(Authorization: Optional[str] = Header(None)):
     start_of_last_month = datetime(year=year, month=month, day=day, hour=hour-1).strftime("%y-%m-%d-%H")
 
     # data_now = request to raspberry pi
+    ip = firebase.get_user_ip(uid)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{ip}/ocr", data={
+
+        })
+
     # 아래는 임시 데이터 적용
     data_now = {
         'gas': 180,
@@ -191,22 +197,27 @@ def is_user_in(nickname: str):
           dependencies=[Depends(JWTBearer())],
            responses=res.sign_up(),
           description="회원가입한 유저의 데이터를 서버 데이터베이스에 저장. 닉네임, 사용자 가스, 전기 사용량을 저장")
-def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
+async def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
     nickname = user.nickname
     address = user.address
     gasmeter = user.gasMeter
 
     payload = decodeJWT(Authorization[7:])
     uid = payload['uid']
+    domain = sql_user.getDomainFromAddress(address)
     if sql_user.searchNickname(nickname):
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content={"signup": "ignored"})
     
+    res = await init_pi(domain, uid, "append")
+    
     firebase.push(uid=uid, type="nickname", data=nickname)
-    firebase.push(uid=uid, type="ip", data=sql_user.getDomainFromAddress(address))
+    firebase.push(uid=uid, type="ip", data=domain)
     gasmeter = int(gasmeter)
-    firebase.push(uid=uid, type="gas", data=['', gasmeter])
+    firebase.push(uid=uid, type="gas", data=['', res['gas']])
     sql_user.appendNickname(nickname, uid)
+
     # DELETE FROM nicknames WHERE nickname='test10';
+
 
     firebase.create_user({
         'uid': uid,
@@ -235,18 +246,32 @@ def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
     # 값 반환
     return "asdf"
 
+async def init_pi(domain: str, uid: str, command: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.post(domain+"/init", data={
+            "uid": uid,
+            "command": command
+        })
+
+    return response.json()
+
 @app.delete("/deleteaccount", tags=["사용자 정보"],
           dependencies=[Depends(JWTBearer())],
           responses=res.delete_user()
         )
-def deleteAccount(Authorization: Optional[str] = Header(None)):
+async def deleteAccount(Authorization: Optional[str] = Header(None)):
     token = Authorization[7:]
     payload = decodeJWT(token)
+    uid = payload['uid']
 
-    res = firebase.delete_user(payload['uid'])
-    nickname = payload['nickname']
+    domain = firebase.get_user_ip(uid)
+    _ = await init_pi(domain, uid, "remove")
+
+    res = firebase.delete_user(uid)
+    # nickname = payload['nickname']
     try:
-        sql_user.deleteUser(nickname)
+        sql_user.deleteUser(uid)
+        # sql_user.deleteUser(nickname)
     except:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
             'status': 'already deleted - sql_user'
