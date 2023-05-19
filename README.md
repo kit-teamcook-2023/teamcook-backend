@@ -1,5 +1,19 @@
 ## [Swagger Docs](http://34.215.66.235:8000/docs)
 
+## 서버 구조
+
+1. 데이터베이스
+
+    유저 데이터 저장 - firebase
+
+    글 정보 저장 - mysql 8.0.33-0ubuntu0.22.04.2
+
+2. 서버
+
+    OS - Ubuntu 22.04.2
+
+    WAS - fastapi
+
 
 ## 변경점
 
@@ -7,17 +21,20 @@
 		firebase로 저장 시 어떻게 게시글을 가져와야 할 지 모르겠음.
 		검색해도 자료가 부족함.
 		sql은 LIMIT를 이용해서 바로 가져올 수 있음
+
 	2. 닉네임을 mysql에 저장하도록 함.
 		2차 발표 이후 uid를 이용해서 닉네임 설정하려고 하였음.
 		하지만 사용자에게 닉네임을 설정하자! 라고 결정
 
-	3. 크롤링 서버 aws lambda로 이동
-		=> 크롤링하는데 3초가 넘어감... aws lambda 최대가 3초라 더 늘릴 수 없음
-
-	4. frontend와 카카오 로그인 기능 구현 중 cors 오류 발생 및 redirect uri 이슈
+	3. frontend와 카카오 로그인 기능 구현 중 cors 오류 발생 및 redirect uri 이슈
 		=> cors hosts를 ["*"]로 설정. 이전에는 localhost:8000으로 설정하여 외부에서 접근 불가.
 		=> 카카오 redirect uri는 로그인 완료 후 로딩되는 page uri를 입력해야 함.
 			서버 uri를 입력해서 카카오 로그인이 제대로 되지 않았던 현상 발생.
+
+## 변경 시도
+
+    1. 크롤링 서버 aws lambda로 이동
+		=> 크롤링하는데 3초가 넘어감... aws lambda 최대가 3초라 더 늘릴 수 없음
 	
 ## 진행상황
 
@@ -42,6 +59,10 @@
 			aws s3버킷을 이용하여 이미지 업로드, s3버킷의 이미지 경로를 통해 이미지를 보여줌
 
         7. 간단하게 chatting_server를 websocket을 이용하여 구현 완료
+
+        8. 라즈베리파이와 서버 간 통신
+		
+		9. pymysql healthcheck 기눙 구현
 		
 	구현 중
 
@@ -51,15 +72,11 @@
 		2. 각 api 작성 후 docs 추가
 
 		3. chatting_server를 어떻게 제대로 사용할 것인가? 고민중
-		
-		4. pymysql healthcheck 기눙 구현
+
 
 	구현 해야 할 것
 
-		1. 회원가입 시 기기와 통신 - 라즈베리파이 필요
-			lora 통신 기능 수행할 수 있어야함.
-			local로 wifi 공유기 dns 쓰면 되긴 한데...
-			실 사용에서는 lora 필요함
+		1. 회원가입 시 기기와  LoRa 통신
 
         2. firebase 구글 로그인 테스트
 
