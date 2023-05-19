@@ -20,3 +20,7 @@ class Comment(BaseModel):
     post_id: int
     author: Optional[str]
     content: str
+
+class OCRData(BaseModel):
+    dummy: Optional[str]
+    ocr_data: str

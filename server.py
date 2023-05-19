@@ -6,7 +6,7 @@ from database.user_sql import UserSQL
 from database.chat_sql import ChatSQL
 
 # 서버 구축을 위한 fastapi
-from fastapi import FastAPI, Depends, Header, status, Request, WebSocket, UploadFile, File
+from fastapi import FastAPI, Depends, Header, status, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.websockets import WebSocketState
@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 import json
 
 from utils.responces import Responces
-from utils.models import UserSignUp, Writing, Clearfirebase, Comment
+from utils.models import UserSignUp, Writing, Clearfirebase, Comment, OCRData
 from auth.auth_handler import signJWT, decodeJWT
 from auth.auth_bearer import JWTBearer
 load_dotenv(verbose=True)
@@ -61,16 +61,18 @@ app.add_middleware(
 async def root(request: Request):
     return {"title": "hello world"}
 
+
 # params로 fee 받아옴
-@app.post("/gas-fee/{uid}")
-async def get_gas_fee(uid: str, file: UploadFile = File(...)):
-    content = await file.read()
+@app.post("/gas-meter/{uid}")
+async def get_gas_meter(uid: str, item: OCRData):
     uid = uid.strip()
-    data = json.loads(content.decode('utf-8'))
-    print(data)
-    gas_meter = data['gas']
-    firebase.push(uid, "gas", gas_meter)
-    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
+    # OCRData일 경우에는 item.ocr_data
+    # OCRData.dict() 한 경우에는 item['ocr_data']
+    item = item.dict()
+    gas_meter = item['ocr_data']
+    print(uid, gas_meter)
+    # firebase.push(uid, "gas", gas_meter)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=item)
 
 # @app.get("/test-for-pi", tags=["test"])
 # async def testing():
@@ -108,15 +110,19 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
     # data_now = request to raspberry pi
     ip = firebase.get_user_ip(uid)
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{ip}/ocr", data={
+        response = await client.get(f"{ip}/ocr")
+        data = response.json()
 
-        })
+    data_now = {
+        'gas': data['ocr_data']
+    }
+
 
     # 아래는 임시 데이터 적용
-    data_now = {
-        'gas': 180,
-        'elec': 700
-    }
+    # data_now = {
+    #     'gas': 180,
+    #     'elec': 700
+    # }
     data_cur = firebase.search(uid, start_of_cur_month)
     data_last = firebase.search(uid, start_of_last_month)
     rate_cur = firebase.search('rating', start_of_cur_month)
@@ -208,7 +214,10 @@ async def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
     if sql_user.searchNickname(nickname):
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content={"signup": "ignored"})
     
-    res = await init_pi(domain, uid, "append")
+    try:
+        res = await init_pi(domain, uid, "append")
+    except:
+        res = {'gas': 300}
     
     firebase.push(uid=uid, type="nickname", data=nickname)
     firebase.push(uid=uid, type="ip", data=domain)
@@ -265,7 +274,10 @@ async def deleteAccount(Authorization: Optional[str] = Header(None)):
     uid = payload['uid']
 
     domain = firebase.get_user_ip(uid)
-    _ = await init_pi(domain, uid, "remove")
+    try:
+        _ = await init_pi(domain, uid, "remove")
+    except:
+        None
 
     res = firebase.delete_user(uid)
     # nickname = payload['nickname']
