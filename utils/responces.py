@@ -110,7 +110,8 @@ class Responces():
                                         "date": "23-04-20 17:24:56",
                                         "id": 24
                                     }
-                                ]
+                                ],
+                                "writing_id": "13"
                             }
                         }
                     }

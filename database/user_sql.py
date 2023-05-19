@@ -37,9 +37,12 @@ class UserSQL():
         return wrapper
 
     @healthcheck
-    def appendWriting(self, title:str, content:str, author:str):
+    def appendWriting(self, title:str, content:str, author:str, board:str = None):
         with self._con.cursor() as cur:
-            sql = f"""INSERT INTO `writings`(`title`, `content`, `author`) VALUES('{title}', '{content}', '{author}')"""
+            if board is None:
+                board = "free"
+        
+            sql = f"""INSERT INTO `writings`(`title`, `content`, `author`, `board`) VALUES('{title}', '{content}', '{author}', '{board}')"""
             cur.execute(sql)
             self._con.commit()
 
@@ -60,9 +63,14 @@ class UserSQL():
         self._con.commit()
 
     @healthcheck
-    def getAllWritings(self):
+    def getAllWritings(self, board:str = None):
         with self._con.cursor() as cur:
-            sql = f"""SELECT `id`, `title`, `author`, `date` FROM `writings`"""
+            print(board)
+            if board is None or board == "all":
+                sql_board = ""
+            else:
+                sql_board = f"""WHERE `board`='{board}'"""
+            sql = f"""SELECT `id`, `title`, `author`, `date`, `board` FROM `writings` {sql_board}"""
             cur.execute(sql)
 
             rows = cur.fetchall()
@@ -73,7 +81,8 @@ class UserSQL():
                 'id': row[0],
                 'title': row[1],
                 'author': row[2],
-                'date': row[3].strftime("%y-%m-%d %H:%M:%S")
+                'date': row[3].strftime("%y-%m-%d %H:%M:%S"),
+                'board': row[4]
             })
         
         return ret
@@ -81,15 +90,14 @@ class UserSQL():
     @healthcheck
     def getWriting(self, title:str=None, author:str=None, time:str=None, id:int=None):
         if id == None:
-            sql = f"""SELECT `title`, `content`, `author`, `date`, `id` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
+            sql = f"""SELECT `title`, `content`, `author`, `date`, `id`, `board` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
         else:
-            sql = f"""SELECT `title`, `content`, `author`, `date`, `id` FROM `writings` WHERE `id`='{id}'"""
-        
+            sql = f"""SELECT `title`, `content`, `author`, `date`, `id`, `board` FROM `writings` WHERE `id`='{id}'"""
         
         with self._con.cursor() as cur:
             cur.execute(sql)
 
-            row = cur._cur.fetchone()
+            row = cur.fetchone()
 
         try:
             ret = {
@@ -97,7 +105,8 @@ class UserSQL():
                     'title': row[0],
                     'content': row[1],
                     'author': row[2],
-                    'date': row[3].strftime("%y-%m-%d %H:%M:%S")
+                    'date': row[3].strftime("%y-%m-%d %H:%M:%S"),
+                    'board': row[5]
                 },
                 'parent': row[4]
             }
@@ -106,9 +115,14 @@ class UserSQL():
         return ret
 
     @healthcheck
-    def getWritingsCount(self):
+    def getWritingsCount(self, board:str = None):
         with self._con.cursor() as cur:
-            sql = f"""SELECT COUNT(*) FROM `writings`"""
+            if board is None or board == "all":
+                sql_board = ""
+            else:
+                sql_board = f"""WHERE `board`='{board}'"""
+
+            sql = f"""SELECT COUNT(*) FROM `writings` {sql_board}"""
             cur.execute(sql)
             row = cur.fetchone()
 
@@ -169,24 +183,34 @@ class UserSQL():
         self._con.commit()
 
     @healthcheck
-    def getSearchWritingsCount(self, type:str, data:str):
+    def getSearchWritingsCount(self, type:str, data:str, board:str = None):
         with self._con.cursor() as cur:
-            if type == 'author':
-                sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}`='{data}'"""
+            if board is None or board == "all":
+                sql_board = ""
             else:
-                sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}` LIKE '%{data}%'"""
+                sql_board = f"""AND `board`='{board}'"""
+
+            if type == 'author':
+                sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}`='{data}' {sql_board}"""
+            else:
+                sql = f"""SELECT COUNT(*) FROM `writings` WHERE `{type}` LIKE '%{data}%' {sql_board}"""
             cur.execute(sql)
             row = cur.fetchone()
 
         return {'row_count': row[0]}
 
     @healthcheck
-    def searchWriting(self, type:str, data:str, page:int):
-        with self._con.cursor as cur:
-            if type == 'author':
-                sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}`='{data}' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+    def searchWriting(self, type:str, data:str, page:int, board:str = None):
+        with self._con.cursor() as cur:
+            if board is None or board == "all":
+                sql_board = ""
             else:
-                sql = f"""SELECT `title`, `author`, `date`, `id` FROM `writings` WHERE `{type}` LIKE '%{data}%' ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+                sql_board = f"""AND `board`='{board}'"""
+            
+            if type == 'author':
+                sql = f"""SELECT `title`, `author`, `date`, `id`, `board` FROM `writings` WHERE `{type}`='{data}' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+            else:
+                sql = f"""SELECT `title`, `author`, `date`, `id`, `board` FROM `writings` WHERE `{type}` LIKE '%{data}%' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
             cur.execute(sql)
             rows = cur.fetchall()
 
@@ -196,7 +220,8 @@ class UserSQL():
                 'id': row[3],
                 'title': row[0],
                 'author': row[1],
-                'date': row[2].strftime("%y-%m-%d %H:%M:%S")
+                'date': row[2].strftime("%y-%m-%d %H:%M:%S"),
+                'board': row[4]
             })
 
         return ret
@@ -268,6 +293,7 @@ class UserSQL():
                     title VARCHAR(200) NOT NULL,
                     content VARCHAR(10000) NOT NULL,
                     author VARCHAR(20) NOT NULL,
+                    board VARCHAR(20) NOT NULL,
                     `date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (id)
                 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4

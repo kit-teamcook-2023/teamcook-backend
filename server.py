@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 import json
 
 from utils.responces import Responces
-from utils.models import UserSignUp, Writing, Clearfirebase, Comment, OCRData
+from utils.models import UserSignUp, SaveWriting, Clearfirebase, Comment, OCRData
 from auth.auth_handler import signJWT, decodeJWT
 from auth.auth_bearer import JWTBearer
 load_dotenv(verbose=True)
@@ -303,10 +303,11 @@ async def deleteAccount(Authorization: Optional[str] = Header(None)):
          description="게시글 검색",
          responses=res.search_posts())
 # responce 추가 필요
-def searchPosts(type:str, data:str, page:int):
+def searchPosts(type:str, data:str, page:int, board: Optional[str] = None):
     # print(type, data, page)
-    count = sql_user.getSearchWritingsCount(type, data)
-    posts = sql_user.searchWriting(type, data, page)
+    
+    count = sql_user.getSearchWritingsCount(type, data, board)
+    posts = sql_user.searchWriting(type, data, page, board)
     ret = {
         'post_counts': count['row_count'],
         'posts': posts
@@ -316,9 +317,9 @@ def searchPosts(type:str, data:str, page:int):
 @app.get("/all-posts", tags=["게시판"],
          description="전체 게시글 반환",
          responses=res.get_all_posts())
-def getAllPosts():
-    result = sql_user.getAllWritings()
-    rows = sql_user.getWritingsCount()['row_count']
+def getAllPosts(board: Optional[str] = None):
+    result = sql_user.getAllWritings(board)
+    rows = sql_user.getWritingsCount(board)['row_count']
     ret = {
         'counts': rows,
         'posts': result
@@ -333,6 +334,7 @@ def getPostAndComments(id:int):
     result = sql_user.getWriting(id=id)
     try:
         ret['writing'] = result['write']
+        ret['writing_id'] = result['parent']
     except:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
             "status": "Not exist post id"
@@ -351,15 +353,19 @@ def getPostAndComments(id:int):
           dependencies=[Depends(JWTBearer())],
          description="게시글 작성",
          responses=res.post_post())
-def insertPostToMysql_user(writing: Writing, Authorization: Optional[str] = Header(None)):
+def insertPostToMysql_user(writing: SaveWriting, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
 
     # author = writing.author
     author = payload['nickname']
     title = writing.title
     content = writing.content
+    board = None
+    if writing.board:
+        board = writing.board
+
     try:
-        sql_user.appendWriting(title,content,author)
+        sql_user.appendWriting(title,content,author,board)
         id = sql_user.getLastPost(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
             "id": id,

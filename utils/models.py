@@ -8,10 +8,10 @@ class UserSignUp(BaseModel):
     gasMeter: Optional[int] = None
     elecMeter: Optional[int] = None
 
-class Writing(BaseModel):
+class SaveWriting(BaseModel):
     title: str
-    author: Optional[str]
     content: str
+    board: Optional[str]
 
 class Clearfirebase(BaseModel):
     isAdmin: str
