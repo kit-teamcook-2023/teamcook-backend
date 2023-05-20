@@ -320,6 +320,7 @@ class UserSQL():
                 CREATE TABLE nicknames (
                     id INT NOT NULL AUTO_INCREMENT,
                     nickname VARCHAR(20) NOT NULL,
+                    uid VARCHAR(30) NOT NULL,
                     PRIMARY KEY (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
