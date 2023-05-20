@@ -269,8 +269,8 @@ async def init_pi(domain: str, uid: str, command: str):
           responses=res.delete_user()
         )
 async def deleteAccount(Authorization: Optional[str] = Header(None)):
-    token = Authorization[7:]
-    payload = decodeJWT(token)
+    token = decodeJWT(Authorization[7:])
+    payload = token
     uid = payload['uid']
 
     domain = firebase.get_user_ip(uid)
