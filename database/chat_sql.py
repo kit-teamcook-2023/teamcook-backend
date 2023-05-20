@@ -21,7 +21,7 @@ class ChatSQL():
                 host='localhost', 
                 user=os.getenv("MYSQL_ID"), 
                 password=os.getenv("MYSQL_PW"), 
-                db=os.getenv("MYSQL_self._con_CHAT"), 
+                db=os.getenv("MYSQL_DB_CHAT"), 
                 charset='utf8mb4'
             )
 
