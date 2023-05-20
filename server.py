@@ -529,7 +529,7 @@ def test_kakao(uid:int):
 
     return firebase.get_user_kakao(str(uid))
 
-@app.get("/prev-chat/{user_nickname}", tags=["chatting", "websocket"], dependencies=[Depends(JWTBearer())])
+@app.get("/prev-chat/{user_nickname}", tags=["chatting"], dependencies=[Depends(JWTBearer())])
 def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)):
     payload = decodeJWT(Authorization[7:])
     uid = int(payload['uid'])
