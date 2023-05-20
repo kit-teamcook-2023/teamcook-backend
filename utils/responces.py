@@ -310,3 +310,26 @@ class Responces():
                 }
             }
         }
+
+    def get_previous_chat(self):
+        return {
+            200: {
+                "description": "이전  조회 성공",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                                'sender': 'test1',
+                                'message': 'testing',
+                                'date': "23-04-10T10:32:41"
+                            },
+                            {
+                                'sender': 'test2',
+                                'message': 'testing_',
+                                'date': "23-04-10T10:32:43"
+                            },
+                        ]
+                    }
+                }
+            }
+        }

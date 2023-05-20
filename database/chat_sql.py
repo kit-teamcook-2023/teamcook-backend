@@ -69,10 +69,18 @@ class ChatSQL():
     @healthcheck
     def get_previous_chat(self, chatting_room_id: str):
         try:
+            res = []
             with self._con.cursor() as cursor:
                 sql = f"""SELECT * FROM chat_log WHERE `room_name`='{chatting_room_id}'"""
                 cursor.execute(sql)
-                res = cursor.fetchall()
+                chats = cursor.fetchall()
+
+                for chat in chats:
+                    res.append({
+                        "sender": chat[2],
+                        "message": chat[3],
+                        "time": chat[4]
+                    })
         except:
-            res = []
+            pass
         return res
