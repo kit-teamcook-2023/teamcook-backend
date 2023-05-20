@@ -427,7 +427,7 @@ def removePostFromMysql_user(id:int , nickname: str, Authorization: Optional[str
          dependencies=[Depends(JWTBearer())],
          responses=res.delete("comment"))
 def removeCommentFromMysql_user(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
-    payload = Authorization[7:]
+    payload = decodeJWT(Authorization[7:])
     if payload['nickname'] != nickname:
         return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
             "status": "Not allowed"
@@ -512,7 +512,7 @@ async def test(uid):
     #     return JSONResponse(status_code=status.HTTP_200_OK)
     #     return status.HTTP_200_OK
 
-@app.put('/test', tags=["test"])
+@app.put('/clear_db', tags=["clear_db"])
 def clearfirebase(cls:Clearfirebase):
     if cls.isAdmin == "if Mysql_userRemoveAcceepted == IsAdmin then Do_Reset_Database":
         sql_user.clearDatabase()
@@ -529,25 +529,34 @@ def test_kakao(uid:int):
 
     return firebase.get_user_kakao(str(uid))
 
-@app.get("/chatting/{chatting_room_id}/chat", tags=["chatting", "websocket"])
-def get_previous_chat(chatting_room_id: str):
+@app.get("/prev-chat/{user_nickname}", tags=["chatting", "websocket"], dependencies=[Depends(JWTBearer())])
+def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    uid = int(payload['uid'])
+    other_uid = int(sql_user.findUidUSENickname(user_nickname))
+    if uid > other_uid:
+        chatting_room_id = f"""{uid}-{other_uid}"""
+    else:
+        chatting_room_id = f"""{other_uid}-{uid}"""
     return sql_chat.get_previous_chat(chatting_room_id)
+
+
+# @app.get("/prev-chat/{chatting_room_id}", tags=["chatting", "websocket"])
+# def get_previous_chat(chatting_room_id: str):
+#     return sql_chat.get_previous_chat(chatting_room_id)
 
 active_connections = {}
 # 채팅방에 입장하는 WebSocket 연결 처리
 @app.websocket("/chat/{uid1}-{uid2}")
 async def websocket_endpoint(uid1: str, uid2: str, websocket: WebSocket):
     await websocket.accept()
-
     # 채팅방 주소 생성
     room_address = f"{uid1}-{uid2}"
     if not sql_chat.room_exisits(room_address):
         sql_chat.create_room(room_address)
-    print(room_address)
 
     # 채팅방에 사용자 추가
     add_user_to_chat_room(room_address, websocket)
-    print("append complete")
 
     try:
         while True:
@@ -555,7 +564,7 @@ async def websocket_endpoint(uid1: str, uid2: str, websocket: WebSocket):
             data = await websocket.receive_text()
 
             # 테스트로는 sender: data 형식으로 받아올 예정
-            human, data = map(str, data.replace(" ", "").split(":"))
+            human, data = split_chatting_message(data)
 
             # 메시지 전송
             await send_message_to_chat_room(room_address, data, websocket)
@@ -569,6 +578,16 @@ async def websocket_endpoint(uid1: str, uid2: str, websocket: WebSocket):
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.close()
 
+# 채팅 구분
+def split_chatting_message(message: str):
+    temp = message.replace(" ", "").split(":")
+    if len(temp) == 1:
+        human = "testing_____"
+        data = temp[0]
+    else:
+        human, data = map(str, temp)
+    
+    return human, data
 
 # 채팅방에 사용자 추가
 def add_user_to_chat_room(room_address: str, websocket: WebSocket):
