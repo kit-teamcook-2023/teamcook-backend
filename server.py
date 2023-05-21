@@ -537,10 +537,9 @@ def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)
     payload = decodeJWT(Authorization[7:])
     uid = int(payload['uid'])
     other_uid = int(sql_user.findUidUSENickname(user_nickname))
-    if uid > other_uid:
-        chatting_room_id = f"""{uid}-{other_uid}"""
-    else:
-        chatting_room_id = f"""{other_uid}-{uid}"""
+
+    chatting_room_id = make_chatting_room_id(uid, other_uid)
+    
     return sql_chat.get_previous_chat(chatting_room_id)
 
 
@@ -550,16 +549,22 @@ def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)
 
 active_connections = {}
 # 채팅방에 입장하는 WebSocket 연결 처리
-@app.websocket("/chat/{uid1}-{uid2}")
-async def websocket_endpoint(uid1: str, uid2: str, websocket: WebSocket):
+@app.websocket("/chat/{my_uid}/{opo_nickname}")
+async def websocket_endpoint(my_uid: str, opo_nickname: str, websocket: WebSocket):
     await websocket.accept()
     # 채팅방 주소 생성
-    room_address = f"{uid1}-{uid2}"
-    if not sql_chat.room_exisits(room_address):
-        sql_chat.create_room(room_address)
+    other_uid = int(sql_user.findUidUSENickname(opo_nickname))
+    uid = int(my_uid)
+
+    my_nickname = sql_user.findNicknameUSEUid(my_uid)
+
+    chatting_room_id = make_chatting_room_id(uid, other_uid)
+
+    if not sql_chat.room_exisits(chatting_room_id):
+        sql_chat.create_room(chatting_room_id)
 
     # 채팅방에 사용자 추가
-    add_user_to_chat_room(room_address, websocket)
+    add_user_to_chat_room(chatting_room_id, websocket)
 
     try:
         while True:
@@ -570,16 +575,21 @@ async def websocket_endpoint(uid1: str, uid2: str, websocket: WebSocket):
             human, data = split_chatting_message(data)
 
             # 메시지 전송
-            await send_message_to_chat_room(room_address, data, websocket)
+            await send_message_to_chat_room(chatting_room_id, data, websocket)
 
             # 메시지 백업
-            sql_chat.backup_message(room_address, data, human)
+            sql_chat.backup_message(chatting_room_id, data, human)
 
     except Exception:
         # WebSocket 연결이 종료되면 사용자를 채팅방에서 제거
-        remove_user_from_chat_room(room_address, websocket)
+        remove_user_from_chat_room(chatting_room_id, websocket)
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.close()
+
+def make_chatting_room_id(uid: str, opo_uid: str):
+    uid = int(uid)
+    opo_uid = int(opo_uid)
+    return f"""{uid}-{opo_uid}""" if uid < opo_uid else f"""{opo_uid}-{uid}"""
 
 # 채팅 구분
 def split_chatting_message(message: str):
