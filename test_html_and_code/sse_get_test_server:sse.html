@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <script>
+            const eventSource = new EventSource('http://34.215.66.235:9000/connect/20');
+
+            eventSource.onmessage = (event) => {
+                console.log('New message:', event.data);
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('EventSource failed:', error);
+                eventSource.close();
+            };
+        </script>
+    </body>
+</html>

@@ -11,9 +11,19 @@
     <input type="text" id="message-input">
     <button onclick="sendMessage()">Send</button>
 
-    <script>
-		sendGetRequest('http://34.215.66.235:8000/prev-chat/test2');
-        const socket = new WebSocket('ws://34.215.66.235:8000/chat/102890172904-102890172904');
+    <script>            
+		const eventSource = new EventSource('http://34.215.66.235:9000/connect/10');
+
+		eventSource.onmessage = (event) => {
+			console.log('New message:', event.data);
+		};
+
+		eventSource.onerror = (error) => {
+			console.error('EventSource failed:', error);
+			eventSource.close();
+		};
+		
+        const socket = new WebSocket('ws://34.215.66.235:9000/ws/10');
 		const messageInput = document.getElementById('message-input');
         socket.onmessage = (event) => {
             const messageDiv = document.createElement('div');
@@ -28,19 +38,20 @@
         }
 		
 		function sendGetRequest(url) {
-			return fetch(url, {
-					method: "GET",
-					headers: {
-						Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuaWNrbmFtZSI6InRlc3QyIiwidWlkIjoiMTAyODkwMTcyOTA0IiwiZXhwIjoxNjg3MTgxMjExfQ.TRA_mUeli1L_a7NE4PnAjY-PhaootMrk7uC3sQcv5n8"
-					}
-				})
-				.then(response => response.json())
-				.then(data => {
-					console.log(data);
-				})
-				.catch(error => {
-					console.error('Error:', error);
-				});
+			fetch(url, {
+				method: "GET",
+				headers: {
+					Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuaWNrbmFtZSI6InRlc3QyIiwidWlkIjoiMTAyODkwMTcyOTA0IiwiZXhwIjoxNjg3MTgxMjExfQ.TRA_mUeli1L_a7NE4PnAjY-PhaootMrk7uC3sQcv5n8"
+				}
+			})
+			.then(response => response.json())
+			.then(data => {
+				console.log(data);
+				msgs = data;
+			})
+			.catch(error => {
+				console.error('Error:', error);
+			});
 		}
     </script>
 </body>
