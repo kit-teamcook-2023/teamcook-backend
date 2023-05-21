@@ -28,12 +28,14 @@ load_dotenv(verbose=True)
 
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+CLEAR_DB_KEY = os.getenv('CLEAR_DB_KEY')
 
 app = FastAPI()
 firebase = Firebase() # credential은 호출하는 파일의 디렉터리에 있어야한다!
 sql_user = UserSQL()
 sql_chat = ChatSQL()
 res = Responces()
+
 
 origins = [
     "http://localhost",
@@ -514,7 +516,7 @@ async def test(uid):
 
 @app.put('/clear_db', tags=["clear_db"])
 def clearfirebase(cls:Clearfirebase):
-    if cls.isAdmin == "if Mysql_userRemoveAcceepted == IsAdmin then Do_Reset_Database":
+    if cls.isAdmin == CLEAR_DB_KEY:
         sql_user.clearDatabase()
         return status.HTTP_200_OK
     return status.HTTP_400_BAD_REQUEST
