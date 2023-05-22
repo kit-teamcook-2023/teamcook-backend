@@ -1,4 +1,5 @@
 # firebase 데이터베이스에 접근하기 위한 클래스
+import asyncio
 from database.firebase import Firebase
 
 # 게시판 데이터베이스에 접근하기 위한 클래스
@@ -8,7 +9,7 @@ from database.chat_sql import ChatSQL
 # 서버 구축을 위한 fastapi
 from fastapi import FastAPI, Depends, Header, status, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.websockets import WebSocketState
 from typing import Optional
 # from pydantic import BaseModel
@@ -22,6 +23,7 @@ import json
 
 from utils.responces import Responces
 from utils.models import UserSignUp, SaveWriting, Clearfirebase, Comment, OCRData
+from utils.sse import ConnectionManager
 from auth.auth_handler import signJWT, decodeJWT
 from auth.auth_bearer import JWTBearer
 load_dotenv(verbose=True)
@@ -35,7 +37,7 @@ firebase = Firebase() # credential은 호출하는 파일의 디렉터리에 있
 sql_user = UserSQL()
 sql_chat = ChatSQL()
 res = Responces()
-
+manager = ConnectionManager()
 
 origins = [
     "http://localhost",
@@ -381,14 +383,18 @@ def insertPostToMysql_user(writing: SaveWriting, Authorization: Optional[str] = 
 @app.post("/comment", tags=["게시판"],
          description="댓글 작성",
          responses=res.post_comment())
-def insertCommentToMysql_user(comment: Comment, Authorization: Optional[str] = Header(None)):
+async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
     author = payload['nickname']
     content = comment.content
     post_id = comment.post_id
     title = "" # 미래에 사용할 수도 있음
 
+    post_title, post_author = sql_user.getWritingInfo(str(post_id))
+    author_uid = sql_user.getUidFromNickname(post_author)
+
     try:
+        await manager.send_event(f"A new comment on {post_title} has been created!", author_uid)
         sql_user.appendComment(title, content, author, post_id)
         comment_id = sql_user.getLastComment(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
@@ -553,12 +559,12 @@ active_connections = {}
 async def websocket_endpoint(my_uid: str, opo_nickname: str, websocket: WebSocket):
     await websocket.accept()
     # 채팅방 주소 생성
-    other_uid = int(sql_user.findUidUSENickname(opo_nickname))
-    uid = int(my_uid)
+    opo_uid = sql_user.findUidUSENickname(opo_nickname)
+    uid = my_uid
 
     my_nickname = sql_user.findNicknameUSEUid(my_uid)
 
-    chatting_room_id = make_chatting_room_id(uid, other_uid)
+    chatting_room_id = make_chatting_room_id(uid, opo_uid)
 
     if not sql_chat.room_exisits(chatting_room_id):
         sql_chat.create_room(chatting_room_id)
@@ -570,6 +576,9 @@ async def websocket_endpoint(my_uid: str, opo_nickname: str, websocket: WebSocke
         while True:
             # 클라이언트로부터 메시지 수신
             data = await websocket.receive_text()
+
+            # 상대방에게 sse 메시지 전달
+            await manager.send_event(f"A new chat room {chatting_room_id} has been created!", opo_uid)
 
             # 테스트로는 sender: data 형식으로 받아올 예정
             human, data = split_chatting_message(data)
@@ -621,3 +630,38 @@ async def send_message_to_chat_room(room_address: str, message: str, mysocket: W
         for socket in active_connections[room_address]:
             if socket is not mysocket:
                 await socket.send_text(message)
+
+# 로그인 후 sse 연결
+# front에서 이 경로로 get 요청
+# 이 부분은 토큰 인증 불가...
+@app.get("/connect/{client_id}", tags=["sse"])
+async def connect(client_id: str):
+    queue = await manager.connect(client_id)
+
+    async def event_stream():
+        try:
+            while True:
+                message = await queue.get()
+                yield f"data:{message}\n\n"
+        except asyncio.CancelledError:
+            manager.disconnect(client_id)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+# jwt 토큰을 이용해 다른 사람이 해당 연결을 끊지 못하게끔 설정
+@app.get("/disconnect", tags=["sse"],
+         dependencies=[Depends(JWTBearer())])
+async def disconnect(Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    uid = payload['uid']
+    manager.disconnect(uid)
+    return {"status": "disconnected"}
+
+@app.get("/send_event/{client_id}", tags=["sse"])
+async def send_event(client_id: str):
+    await manager.send_event("Some event data", client_id)
+    return {"status": "event sent"}
+
+@app.get("/logs", tags=["logs"])
+async def get_logs():
+    return {}
