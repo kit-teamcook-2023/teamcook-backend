@@ -227,6 +227,15 @@ class UserSQL():
         return ret
 
     @healthcheck
+    def getWritingInfo(self, post_id:str):
+        with self._con.cursor() as cur:
+            sql = f"""SELECT `title`, `author` FROM `writings` WHERE `id`='{post_id}'"""
+            cur.execute(sql)
+            row = cur.fetchone()
+        
+        return row[0], row[1]
+
+    @healthcheck
     def deleteUser(self, uid:str):
         with self._con.cursor() as cur:
             sql = f"""DELETE FROM nicknames WHERE `uid`='{uid}'"""
