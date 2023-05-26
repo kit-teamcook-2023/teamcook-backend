@@ -90,9 +90,9 @@ class UserSQL():
     @healthcheck
     def getWriting(self, title:str=None, author:str=None, time:str=None, id:int=None):
         if id == None:
-            sql = f"""SELECT `title`, `content`, `author`, `date`, `id`, `board` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
+            sql = f"""SELECT * FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
         else:
-            sql = f"""SELECT `title`, `content`, `author`, `date`, `id`, `board` FROM `writings` WHERE `id`='{id}'"""
+            sql = f"""SELECT * FROM `writings` WHERE `id`='{id}'"""
         
         with self._con.cursor() as cur:
             cur.execute(sql)
@@ -100,15 +100,17 @@ class UserSQL():
             row = cur.fetchone()
 
         try:
+            # id title content author board date likes
             ret = {
                 'write': {
-                    'title': row[0],
-                    'content': row[1],
-                    'author': row[2],
-                    'date': row[3].strftime("%y-%m-%d %H:%M:%S"),
-                    'board': row[5]
+                    'title': row[1],
+                    'content': row[3],
+                    'author': row[3],
+                    'date': row[5].strftime("%y-%m-%d %H:%M:%S"),
+                    'board': row[4],
+                    'likes': row[6]
                 },
-                'parent': row[4]
+                'parent': row[0]
             }
         except:
             ret = {}
@@ -208,19 +210,21 @@ class UserSQL():
                 sql_board = f"""AND `board`='{board}'"""
             
             if type == 'author':
-                sql = f"""SELECT `title`, `author`, `date`, `id`, `board` FROM `writings` WHERE `{type}`='{data}' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+                sql = f"""SELECT `title`, `author`, `date`, `id`, `board`, `likes` FROM `writings` WHERE `{type}`='{data}' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
             else:
-                sql = f"""SELECT `title`, `author`, `date`, `id`, `board` FROM `writings` WHERE `{type}` LIKE '%{data}%' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+                sql = f"""SELECT `title`, `author`, `date`, `id`, `board`, `likes` FROM `writings` WHERE `{type}` LIKE '%{data}%' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
             cur.execute(sql)
             rows = cur.fetchall()
 
         ret = []
+        # id title content author board date likes
         for row in rows:
             ret.append({
                 'id': row[3],
                 'title': row[0],
                 'author': row[1],
                 'date': row[2].strftime("%y-%m-%d %H:%M:%S"),
+                'likes': int(row[5]),
                 'board': row[4]
             })
 
@@ -285,6 +289,13 @@ class UserSQL():
         return row[0]
 
     @healthcheck
+    def updateLikeCount(self, id:str):
+        with self._con.cursor() as cur:
+            sql = f"""UPDATE `writings` SET `likes`=`likes`+1 WHERE `id`='{id}'"""
+            cur.execute(sql)
+        self._con.commit()
+
+    @healthcheck
     def clearDatabase(self):
         with self._con.cursor() as cursor:
             cursor.execute("DROP DATABASE IF EXISTS writing_table")
@@ -317,6 +328,7 @@ class UserSQL():
                     content VARCHAR(200) NOT NULL,
                     author VARCHAR(20) NOT NULL,
                     `date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `likes` INT NOT NULL DEFAULT 0
                     PRIMARY KEY (id),
                     KEY writing_id (writing_id),
                     CONSTRAINT FK_comment_writing_id_writings_id FOREIGN KEY (writing_id) REFERENCES writings (id) ON DELETE CASCADE ON UPDATE RESTRICT
