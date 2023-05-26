@@ -289,11 +289,31 @@ class UserSQL():
         return row[0]
 
     @healthcheck
-    def updateLikeCount(self, id:str):
+    def updateLikeCount(self, post_id:str, uid:str, isLike:bool):
         with self._con.cursor() as cur:
-            sql = f"""UPDATE `writings` SET `likes`=`likes`+1 WHERE `id`='{id}'"""
+            sql = f"""SELECT COUNT(*) FROM `likes` WHERE `uid`='{uid}' AND `post_id`='{post_id}'"""
+            cur.execute(sql)
+            row = int(cur.fetchone()[0])
+            if isLike:
+                if row != 0:
+                    return False
+                
+                sql = f"""INSERT INTO `likes`(`uid`, `post_id`) VALUES ('{uid}', '{post_id}')"""
+                cur.execute(sql)
+
+                sql = f"""UPDATE `writings` SET `likes`=`likes`+1 WHERE `id`='{post_id}'"""
+            else:
+                if row == 0:
+                    return False
+
+                sql = f"""DELETE FROM `likes` WHERE `uid`='{uid}' AND `post_id`='{post_id}'"""
+                cur.execute(sql)
+                
+                sql = f"""UPDATE `writings` SET `likes`=`likes`-1 WHERE `id`='{post_id}'"""
             cur.execute(sql)
         self._con.commit()
+
+        return True
 
     @healthcheck
     def clearDatabase(self):
@@ -358,6 +378,17 @@ class UserSQL():
             """)
             cursor.execute("ALTER TABLE comments COMMENT='주소_IP테이블'")
             cursor.execute("ALTER TABLE comments AUTO_INCREMENT = 1")
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS `likes` (
+                    `id` INT NOT NULL AUTO_INCREMENT,
+                    `post_id` VARCHAR(45) NOT NULL,
+                    `uid` VARCHAR(45) NOT NULL,
+                    PRIMARY KEY (`id`))
+                ENGINE = InnoDB
+                DEFAULT CHARACTER SET = utf8mb4
+                COLLATE = utf8mb4_0900_ai_ci
+            """)
 
             cursor.execute("""
                 INSERT INTO nicknames(`nickname`) VALUES ('test1'), ('test2'); 

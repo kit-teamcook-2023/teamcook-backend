@@ -473,6 +473,32 @@ def removeCommentFromMysql_user(id:int , nickname: str, Authorization: Optional[
             "status": "Remove comment failed"
         })
 
+@app.put("/like/{id}/{isLike}", tags=["게시판"],
+         description="좋아요 +1/-1, isLike에 y:+1, n:-1",
+         dependencies=[Depends(JWTBearer())],
+         responses=res.modify_like())
+def updatePostingLike(id:int, isLike:str, Authorization: Optional[str] = Header(None)):
+    # 좋아요 수를 한 인원의 중복 체크를 어떻게 할 것인가?
+    # 데베에 다 때려박나?
+    # 일단 좋아요 반영 구현
+    payload = decodeJWT(Authorization[7:])
+    uid = payload['uid']
+    try:
+        isLike = True if isLike == "y" else False
+        res = sql_user.updateLikeCount(id, uid, isLike)
+        if res:
+            return JSONResponse(status_code=status.HTTP_200_OK, content={
+                "status": "Like successed"
+            })
+        else:
+            return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
+                "status": "Like failed"
+            })
+    except:
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
+            "status": "Like failed"
+        })
+
 @app.get("/auth/kakao/callback", tags=["카카오 인증 콜백"],
     responses=res.kakao_callback())
 async def kakao_callback(request: Request, code: str):
@@ -549,15 +575,15 @@ def clearfirebase(cls:Clearfirebase):
         return status.HTTP_200_OK
     return status.HTTP_400_BAD_REQUEST
 
-@app.get("/test-kakao/{uid}", tags=["test"])
-def test_kakao(uid:int):
-    data = {
-        'uid': str(uid),
-        'nickname': 'test1'
-    }
-    firebase.create_user(data)
+# @app.get("/test-kakao/{uid}", tags=["test"])
+# def test_kakao(uid:int):
+#     data = {
+#         'uid': str(uid),
+#         'nickname': 'test1'
+#     }
+#     firebase.create_user(data)
 
-    return firebase.get_user_kakao(str(uid))
+#     return firebase.get_user_kakao(str(uid))
 
 @app.get("/prev-chat/{user_nickname}", tags=["chatting"], dependencies=[Depends(JWTBearer())],
          responses=res.get_previous_chat())

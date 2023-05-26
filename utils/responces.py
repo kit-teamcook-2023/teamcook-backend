@@ -333,3 +333,31 @@ class Responces():
                 }
             }
         }
+
+    def modify_like(self):
+        return {
+            200: {
+                "description": "좋아요 추가/제거 성공",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                                "status": "Like successed"
+                            }
+                        ]
+                    }
+                }
+            }, 
+            400: {
+                "description": "좋아요 추가/제거 실패",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                                "status": "Like failed"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
