@@ -20,10 +20,12 @@ import httpx
 import os
 from dotenv import load_dotenv
 import json
+import atexit
 
 from utils.responces import Responces
 from utils.models import UserSignUp, SaveWriting, Clearfirebase, Comment, OCRData
 from utils.sse import ConnectionManager
+from utils.backup import Backup
 from auth.auth_handler import signJWT, decodeJWT
 from auth.auth_bearer import JWTBearer
 load_dotenv(verbose=True)
@@ -38,6 +40,19 @@ sql_user = UserSQL()
 sql_chat = ChatSQL()
 res = Responces()
 manager = ConnectionManager()
+backup = Backup()
+logs = backup.notification_logs
+
+try:
+    log_index = logs[0]['index']
+except:
+    log_index = 0
+
+def backup_dictionary():
+    backup.index = log_index
+    backup.backup_dictionary()
+
+atexit.register(backup_dictionary)
 
 origins = [
     "http://localhost",
@@ -394,7 +409,14 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
     author_uid = sql_user.getUidFromNickname(post_author)
 
     try:
-        await manager.send_event(f"A new comment on {post_title} has been created!", author_uid)
+        msg = f"A new comment on {post_title} has been created! - {datetime.today().strftime('%d %H-%M')}"
+        if logs[author_uid] is None:
+            logs[author_uid] = {"comment": {log_index : msg}}
+        else:
+            logs[author_uid]["comment"][log_index] = msg
+        log_index += 1
+        
+        await manager.send_event(msg, author_uid)
         sql_user.appendComment(title, content, author, post_id)
         comment_id = sql_user.getLastComment(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
@@ -577,8 +599,14 @@ async def websocket_endpoint(my_uid: str, opo_nickname: str, websocket: WebSocke
             # 클라이언트로부터 메시지 수신
             data = await websocket.receive_text()
 
+            msg = f"A new chat room {chatting_room_id} has been created! - {datetime.today().strftime('%d %H-%M')}"
+            if logs[opo_uid] is None:
+                logs[opo_uid] = {"chat": {my_uid: msg}}
+            else:
+                logs[opo_uid]["chat"][my_uid] = msg
+
             # 상대방에게 sse 메시지 전달
-            await manager.send_event(f"A new chat room {chatting_room_id} has been created!", opo_uid)
+            await manager.send_event(msg, opo_uid)
 
             # 테스트로는 sender: data 형식으로 받아올 예정
             human, data = split_chatting_message(data)
@@ -640,6 +668,23 @@ async def connect(client_id: str):
 
     async def event_stream():
         try:
+            try:
+                chat_logs = logs[client_id]["chat"]
+                for k, v in chat_logs.items():
+                    yield f"log_id:{k}, message:{v}\n\n"
+            except:
+                pass
+
+            try:
+                comment_logs = logs[client_id]["comment"]
+                for k, v in comment_logs.items():
+                    yield f"log_id:{k}, message:{v}\n\n"
+            except:
+                pass
+
+            del(logs[client_id])
+            logs[client_id] = {"comment": {}, "chat": {}}
+
             while True:
                 message = await queue.get()
                 yield f"data:{message}\n\n"
@@ -647,6 +692,36 @@ async def connect(client_id: str):
             manager.disconnect(client_id)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+"""
+logs - {
+        idx: <int>
+        opo_uid_1: {
+            "comment": {
+                "log_id1": "comment_append_str_1", 
+                "log_id2": "comment_append_str_2", 
+                ...
+            },
+            "chat": {
+                my_uid_1: "chatting_sended_str_1",
+                my_uid_2: "chatting_sended_str_2",
+                ...
+            }
+        },
+        opo_uid_2: {
+            "comment": [
+                "comment_append_str_1", 
+                "comment_append_str_2", 
+                ...
+            ],
+            "chat": {
+                my_uid_1: "chatting_sended_str_1",
+                my_uid_2: "chatting_sended_str_2",
+                ...
+            }
+        }
+    }
+"""
 
 # jwt 토큰을 이용해 다른 사람이 해당 연결을 끊지 못하게끔 설정
 @app.get("/disconnect", tags=["sse"],
@@ -661,7 +736,3 @@ async def disconnect(Authorization: Optional[str] = Header(None)):
 async def send_event(client_id: str):
     await manager.send_event("Some event data", client_id)
     return {"status": "event sent"}
-
-@app.get("/logs", tags=["logs"])
-async def get_logs():
-    return {}
