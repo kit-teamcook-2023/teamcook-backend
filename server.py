@@ -23,7 +23,7 @@ import json
 import atexit
 
 from utils.responces import Responces
-from utils.models import UserSignUp, SaveWriting, Clearfirebase, Comment, OCRData
+from utils.models import UserSignUp, SaveWriting, Clearfirebase, Comment, OCRData, PostCommentUpdate
 from utils.sse import ConnectionManager
 from utils.backup import Backup
 from auth.auth_handler import signJWT, decodeJWT
@@ -498,6 +498,32 @@ def updatePostingLike(id:int, isLike:str, Authorization: Optional[str] = Header(
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
             "status": "Like failed"
         })
+
+@app.put("/post/{post_id}", tags=["게시판"],
+         description="글 수정",
+         dependencies=[Depends(JWTBearer())])
+async def updatePost(post_id, data: PostCommentUpdate, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    nickname = payload['nickname']
+    if data.nickname != nickname:
+        return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={"status": "bad request"})
+
+    sql_user.updatePostData(post_id, data.title, data.content)
+
+    return {"result": data}
+
+@app.put("/post/{comment_id}", tags=["게시판"],
+         description="댓글 수정",
+         dependencies=[Depends(JWTBearer())])
+async def updatePost(comment_id, data: PostCommentUpdate, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    nickname = payload['nickname']
+    if data.nickname != nickname:
+        return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={"status": "bad request"})
+    
+    sql_user.updateCommentData(comment_id, data.content)
+
+    return {"result": data}
 
 @app.get("/auth/kakao/callback", tags=["카카오 인증 콜백"],
     responses=res.kakao_callback())

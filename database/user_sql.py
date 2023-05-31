@@ -65,7 +65,6 @@ class UserSQL():
     @healthcheck
     def getAllWritings(self, board:str = None):
         with self._con.cursor() as cur:
-            print(board)
             if board is None or board == "all":
                 sql_board = ""
             else:
@@ -314,6 +313,28 @@ class UserSQL():
         self._con.commit()
 
         return True
+
+    @healthcheck
+    def updatePostData(self, post_id:str, title:str, content:str):
+        with self._con.cursor() as cur:
+            title = f"""`title`='{title}'""" if title is not None else ""
+            content = f"""`content`='{content}'""" if content is not None else ""
+            query = title + (", " + content if title and content else content)
+            if not query:
+                return
+            sql = f"""UPDATE `writings` SET {query} WHERE `id`='{post_id}'"""
+            cur.execute(sql)
+        self._con.commit()
+
+    @healthcheck
+    def updateCommentData(self, comment_id:str, content:str):
+        with self._con.cursor() as cur:
+            content = f"""`content`='{content}'""" if content is not None else ""
+            if not content:
+                return
+            sql = f"""UPDATE `writings` SET {content} WHERE `id`='{comment_id}'"""
+            cur.execute(sql)
+        self._con.commit()
 
     @healthcheck
     def clearDatabase(self):

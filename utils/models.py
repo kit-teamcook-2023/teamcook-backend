@@ -24,3 +24,9 @@ class Comment(BaseModel):
 class OCRData(BaseModel):
     dummy: Optional[str]
     ocr_data: str
+
+class PostCommentUpdate(BaseModel):
+    id: int | str
+    nickname: str
+    title: Optional[str]
+    content: str
