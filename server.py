@@ -530,8 +530,8 @@ async def updatePost(comment_id, data: PostCommentUpdate, Authorization: Optiona
 async def kakao_callback(request: Request, code: str):
     client_id = CLIENT_ID
     client_secret = CLIENT_SECRET
-    redirect_uri = "http://15.165.65.93/auth/kakao/callback"
-    # redirect_uri = "http://localhost:3000/auth/kakao/callback"
+    redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
+    redirect_uri = "http://localhost:3000/auth/kakao/callback" # localhost
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
     
@@ -611,7 +611,7 @@ def clearfirebase(cls:Clearfirebase):
 
 #     return firebase.get_user_kakao(str(uid))
 
-@app.get("/prev-chat/{user_nickname}", tags=["chatting"], dependencies=[Depends(JWTBearer())],
+@app.get("/prev-chat/{opo_user_nickname}", tags=["chatting"], dependencies=[Depends(JWTBearer())],
          responses=res.get_previous_chat())
 def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)):
     payload = decodeJWT(Authorization[7:])
@@ -629,11 +629,14 @@ def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)
 
 active_connections = {}
 # 채팅방에 입장하는 WebSocket 연결 처리
-@app.websocket("/chat/{my_uid}/{opo_nickname}")
-async def websocket_endpoint(my_uid: str, opo_nickname: str, websocket: WebSocket):
+@app.websocket("/chat/{my_uid}/{opo_nickname_or_uid}")
+async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: WebSocket):
     await websocket.accept()
     # 채팅방 주소 생성
-    opo_uid = sql_user.findUidUSENickname(opo_nickname)
+    opo_uid = sql_user.findUidUSENickname(opo_nickname_or_uid)
+    print(opo_uid is None)
+    if opo_uid is None:
+        opo_uid = opo_nickname_or_uid
     uid = my_uid
 
     my_nickname = sql_user.findNicknameUSEUid(my_uid)
@@ -711,14 +714,15 @@ async def send_message_to_chat_room(room_address: str, message: str, mysocket: W
             if socket is not mysocket:
                 await socket.send_text(message)
 
+from sse_starlette.sse import EventSourceResponse
 # 로그인 후 sse 연결
 # front에서 이 경로로 get 요청
 # 이 부분은 토큰 인증 불가...
-@app.get("/connect/{client_id}", tags=["sse"])
+@app.get("/connect/{client_id}", tags=["sse", "use "])
 async def connect(client_id: str):
     queue = await manager.connect(client_id)
 
-    async def event_stream():
+    async def event_generator():
         try:
             try:
                 chat_logs = logs[client_id]["chat"]
@@ -734,15 +738,20 @@ async def connect(client_id: str):
             except:
                 pass
 
-            del(logs[client_id])
+            try:
+                del(logs[client_id])
+            except:
+                pass
             logs[client_id] = {"comment": {}, "chat": {}}
 
             while True:
                 message = await queue.get()
                 yield f"data:{message}\n\n"
+                
         except asyncio.CancelledError:
             manager.disconnect(client_id)
 
+    return EventSourceResponse(event_generator())
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 """
@@ -784,7 +793,7 @@ async def disconnect(Authorization: Optional[str] = Header(None)):
     manager.disconnect(uid)
     return {"status": "disconnected"}
 
-@app.get("/send_event/{client_id}", tags=["sse"])
+@app.get("/send_event/{client_id}", tags=["sse_test"])
 async def send_event(client_id: str):
     await manager.send_event("Some event data", client_id)
     return {"status": "event sent"}
