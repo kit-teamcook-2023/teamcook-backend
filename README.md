@@ -146,6 +146,14 @@
 
             database에 board 컬럼 추가
 
+        
+
+## 삽질
+
+    1. socker.io는 fastapi의 websocket과 호환되지 않는다.
+
+        
+
 
 ## 중간 발표 대비 내용 준비
 
