@@ -71,7 +71,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=allow_methods,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 # root. responce 확인용
@@ -237,10 +237,15 @@ async def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
         res = await init_pi(domain, uid, "append")
     except:
         res = {'gas': 300}
+
+    print(uid)
     
     firebase.push(uid=uid, type="nickname", data=nickname)
     firebase.push(uid=uid, type="ip", data=domain)
-    gasmeter = int(gasmeter)
+    try:
+        gasmeter = int(gasmeter)
+    except:
+        gasmeter = 100
     firebase.push(uid=uid, type="gas", data=['', res['gas']])
     sql_user.appendNickname(nickname, uid)
 
@@ -395,10 +400,12 @@ def insertPostToMysql_user(writing: SaveWriting, Authorization: Optional[str] = 
             "status": "Post post failed"
         })
 
+log_index = 0
 @app.post("/comment", tags=["게시판"],
          description="댓글 작성",
          responses=res.post_comment())
 async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[str] = Header(None)):
+    global log_index
     payload = decodeJWT(Authorization[7:])
     author = payload['nickname']
     content = comment.content
@@ -406,7 +413,14 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
     title = "" # 미래에 사용할 수도 있음
 
     post_title, post_author = sql_user.getWritingInfo(str(post_id))
-    author_uid = sql_user.getUidFromNickname(post_author)
+    author_uid = sql_user.findUidUSENickname(post_author)
+
+    msg = f"A new comment on {post_title} has been created! - {datetime.today().strftime('%d %H-%M')}"
+    if logs[author_uid] is None:
+        logs[author_uid] = {"comment": {log_index : msg}}
+    else:
+        logs[author_uid]["comment"][log_index] = msg
+    log_index += 1
 
     try:
         msg = f"A new comment on {post_title} has been created! - {datetime.today().strftime('%d %H-%M')}"
@@ -530,8 +544,14 @@ async def updatePost(comment_id, data: PostCommentUpdate, Authorization: Optiona
 async def kakao_callback(request: Request, code: str):
     client_id = CLIENT_ID
     client_secret = CLIENT_SECRET
-    redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
-    redirect_uri = "http://localhost:3000/auth/kakao/callback" # localhost
+    
+    print(request.client.host, code)
+
+    if request.client.host == "localhost":
+        redirect_uri = "http://localhost:3000/auth/kakao/callback" # localhost
+    else:
+        redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
+
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
     
@@ -544,6 +564,7 @@ async def kakao_callback(request: Request, code: str):
             "redirect_uri": redirect_uri,
             "code": code
         })
+    print(response.json())
     access_token = response.json().get("access_token")
 
     # 사용자 정보 요청
@@ -554,8 +575,8 @@ async def kakao_callback(request: Request, code: str):
 
     # user_info에 있는 uid값은 int형이었다..!
     uid = str(user_info.get("id"))
+    print(user_info)
     res_code, nickname = firebase.get_user_kakao(uid)
-    # print(res_code)
     if res_code == True:
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content=signJWT(nickname, uid, 30 * 24 * 60 * 60))
     else:
@@ -613,10 +634,13 @@ def clearfirebase(cls:Clearfirebase):
 
 @app.get("/prev-chat/{opo_user_nickname}", tags=["chatting"], dependencies=[Depends(JWTBearer())],
          responses=res.get_previous_chat())
-def get_previous_chat_test(user_nickname: str, Authorization: str = Header(None)):
+def get_previous_chat_test(opo_user_nickname: str, Authorization: str = Header(None)):
     payload = decodeJWT(Authorization[7:])
     uid = int(payload['uid'])
-    other_uid = int(sql_user.findUidUSENickname(user_nickname))
+    try:
+        other_uid = int(sql_user.findUidUSENickname(opo_user_nickname))
+    except:
+        return {}
 
     chatting_room_id = make_chatting_room_id(uid, other_uid)
     
@@ -632,13 +656,21 @@ active_connections = {}
 @app.websocket("/chat/{my_uid}/{opo_nickname_or_uid}")
 async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: WebSocket):
     await websocket.accept()
+    flag = False
     # 채팅방 주소 생성
     opo_uid = sql_user.findUidUSENickname(opo_nickname_or_uid)
-    print(opo_uid is None)
     if opo_uid is None:
+        flag = True
         opo_uid = opo_nickname_or_uid
     uid = my_uid
 
+    op_nickname = sql_user.findNicknameUSEUid(opo_uid)
+    if op_nickname is None and flag is True:
+        await websocket.send_text("400:해당 닉네임 가진 인원 없음")
+        await websocket.close()
+        return {}
+
+    await websocket.send_text("200:연결 성공")
     my_nickname = sql_user.findNicknameUSEUid(my_uid)
 
     chatting_room_id = make_chatting_room_id(uid, opo_uid)
@@ -654,7 +686,7 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
             # 클라이언트로부터 메시지 수신
             data = await websocket.receive_text()
 
-            msg = f"A new chat room {chatting_room_id} has been created! - {datetime.today().strftime('%d %H-%M')}"
+            msg = f"A new chat room {chatting_room_id} has been created! - {datetime.today().strftime('%d %H-%M')} | {data}"
             if logs[opo_uid] is None:
                 logs[opo_uid] = {"chat": {my_uid: msg}}
             else:
@@ -664,19 +696,22 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
             await manager.send_event(msg, opo_uid)
 
             # 테스트로는 sender: data 형식으로 받아올 예정
-            human, data = split_chatting_message(data)
+            # human, data = split_chatting_message(data)
 
             # 메시지 전송
             await send_message_to_chat_room(chatting_room_id, data, websocket)
+            
 
             # 메시지 백업
-            sql_chat.backup_message(chatting_room_id, data, human)
+            sql_chat.backup_message(chatting_room_id, data, my_nickname)
 
     except Exception:
         # WebSocket 연결이 종료되면 사용자를 채팅방에서 제거
         remove_user_from_chat_room(chatting_room_id, websocket)
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.close()
+
+    print("exited")
 
 def make_chatting_room_id(uid: str, opo_uid: str):
     uid = int(uid)
@@ -711,7 +746,7 @@ def remove_user_from_chat_room(room_address: str, websocket: WebSocket):
 async def send_message_to_chat_room(room_address: str, message: str, mysocket: WebSocket):
     if room_address in active_connections:
         for socket in active_connections[room_address]:
-            if socket is not mysocket:
+            # if socket is not mysocket:
                 await socket.send_text(message)
 
 from sse_starlette.sse import EventSourceResponse
