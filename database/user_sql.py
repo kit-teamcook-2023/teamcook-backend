@@ -103,7 +103,7 @@ class UserSQL():
             ret = {
                 'write': {
                     'title': row[1],
-                    'content': row[3],
+                    'content': row[2],
                     'author': row[3],
                     'date': row[5].strftime("%y-%m-%d %H:%M:%S"),
                     'board': row[4],
@@ -269,15 +269,23 @@ class UserSQL():
             sql = f"""SELECT `uid` FROM nicknames WHERE `nickname`='{nickname}'"""
             cur.execute(sql)
             row = cur.fetchone()
-        return row[0]
+        try:
+            ret_value = row[0]
+        except:
+            ret_value = None
+        return ret_value
 
     @healthcheck    
     def findNicknameUSEUid(self, uid: str) -> str:
         with self._con.cursor() as cursor:
             sql = f"""SELECT nickname FROM nicknames WHERE `uid`='{uid}'"""
             cursor.execute(sql)
-            res = cursor.fetchone()
-        return res[0]
+            row = cursor.fetchone()
+        try:
+            ret_value = row[0]
+        except:
+            ret_value = None
+        return ret_value
 
     @healthcheck
     def getDomainFromAddress(self, address:str):
