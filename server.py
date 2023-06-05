@@ -746,7 +746,7 @@ def remove_user_from_chat_room(room_address: str, websocket: WebSocket):
 async def send_message_to_chat_room(room_address: str, message: str, mysocket: WebSocket):
     if room_address in active_connections:
         for socket in active_connections[room_address]:
-            # if socket is not mysocket:
+            if socket is not mysocket:
                 await socket.send_text(message)
 
 from sse_starlette.sse import EventSourceResponse
