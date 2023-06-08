@@ -293,7 +293,11 @@ class UserSQL():
             sql = f"""SELECT domain FROM ips WHERE address='{address}'"""
             cur.execute(sql)
             row = cur.fetchone()
-        return row[0]
+        try:
+            ret = row[0]
+        except:
+            ret = ""
+        return ret
 
     @healthcheck
     def updateLikeCount(self, post_id:str, uid:str, isLike:bool):
@@ -309,14 +313,14 @@ class UserSQL():
                 cur.execute(sql)
 
                 sql = f"""UPDATE `writings` SET `likes`=`likes`+1 WHERE `id`='{post_id}'"""
-            else:
-                if row == 0:
-                    return False
+            # else: # 추천 취소는 없다!
+            #     if row == 0:
+            #         return False
 
-                sql = f"""DELETE FROM `likes` WHERE `uid`='{uid}' AND `post_id`='{post_id}'"""
-                cur.execute(sql)
+            #     sql = f"""DELETE FROM `likes` WHERE `uid`='{uid}' AND `post_id`='{post_id}'"""
+            #     cur.execute(sql)
                 
-                sql = f"""UPDATE `writings` SET `likes`=`likes`-1 WHERE `id`='{post_id}'"""
+            #     sql = f"""UPDATE `writings` SET `likes`=`likes`-1 WHERE `id`='{post_id}'"""
             cur.execute(sql)
         self._con.commit()
 
