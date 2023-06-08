@@ -415,15 +415,8 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
     post_title, post_author = sql_user.getWritingInfo(str(post_id))
     author_uid = sql_user.findUidUSENickname(post_author)
 
-    msg = f"A new comment on {post_title} has been created! - {datetime.today().strftime('%d %H-%M')}"
-    if logs[author_uid] is None:
-        logs[author_uid] = {"comment": {log_index : msg}}
-    else:
-        logs[author_uid]["comment"][log_index] = msg
-    log_index += 1
-
     try:
-        msg = f"A new comment on {post_title} has been created! - {datetime.today().strftime('%d %H-%M')}"
+        msg = f"comment:{post_id}_{post_title}_{datetime.today().strftime('%m/%d %H-%M')}"
         if logs[author_uid] is None:
             logs[author_uid] = {"comment": {log_index : msg}}
         else:
@@ -551,6 +544,8 @@ async def kakao_callback(request: Request, code: str):
         redirect_uri = "http://localhost:3000/auth/kakao/callback" # localhost
     else:
         redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
+
+    redirect_uri = "http://localhost:3000/auth/kakao/callback" # 임시로 고정
 
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
@@ -685,8 +680,11 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
         while True:
             # 클라이언트로부터 메시지 수신
             data = await websocket.receive_text()
+            data = data.split('|')
+            formatted_date = data[1]
+            data = data[0]
 
-            msg = f"A new chat room {chatting_room_id} has been created! - {datetime.today().strftime('%d %H-%M')} | {data}"
+            msg = f"chat:{chatting_room_id}_{data}_{formatted_date}"
             if logs[opo_uid] is None:
                 logs[opo_uid] = {"chat": {my_uid: msg}}
             else:
@@ -699,9 +697,9 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
             # human, data = split_chatting_message(data)
 
             # 메시지 전송
-            await send_message_to_chat_room(chatting_room_id, data, websocket)
+            send_data = f"""{my_nickname}:{data}_{formatted_date}"""
+            await send_message_to_chat_room(chatting_room_id, send_data, websocket)
             
-
             # 메시지 백업
             sql_chat.backup_message(chatting_room_id, data, my_nickname)
 
@@ -781,7 +779,7 @@ async def connect(client_id: str):
 
             while True:
                 message = await queue.get()
-                yield f"data:{message}\n\n"
+                yield f"{message}\n\n"
                 
         except asyncio.CancelledError:
             manager.disconnect(client_id)
