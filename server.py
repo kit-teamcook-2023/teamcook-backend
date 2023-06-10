@@ -128,14 +128,17 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
 
     # data_now = request to raspberry pi
     ip = firebase.get_user_ip(uid)
+    print(ip, uid)
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{ip}/ocr")
-        data = response.json()
+        try:
+            response = await client.get(f"{ip}/ocr")
+            data = response.json()
+        except:
+            data = {'ocr_data': 0}
 
     data_now = {
         'gas': data['ocr_data']
     }
-
 
     # 아래는 임시 데이터 적용
     # data_now = {
@@ -147,12 +150,21 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
     rate_cur = firebase.search('rating', start_of_cur_month)
     rate_last = firebase.search('rating', start_of_last_month)
 
+    try:
+        last_month = calc_fees(data_cur, data_last, rate_last)
+    except:
+        last_month = -1
+
+    try:
+        cur_month = calc_fees(data_now, data_cur, rate_cur)
+    except:
+        cur_month = -1
+
     ret = {
-        'last_month': calc_fees(data_cur, data_last, rate_last),
-        'cur_month' : calc_fees(data_now, data_cur, rate_cur)
+        'last_month': last_month,
+        'cur_month' : cur_month
     }
 
-    
     return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
 
 def calc_fees(cur: dict, last: dict, rate:dict) -> dict:
@@ -373,6 +385,21 @@ def getPostAndComments(id:int):
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
 
+@app.get("/most-like", tags=["게시판"],
+        description="특정 기간 내 가장 많은 좋아요수 가진 글 보여줌",
+        responses=res.get_most_like())
+def getMosePopularPosts_Ten():
+    # 0:id, 1:title, 2:author, 3:date, 4:like
+    ret = [  {
+            'id': x[0],
+            'title': x[1], 
+            'author': x[2],
+            'date': x[3], 
+            'likes': x[4] 
+            } for x in sql_user.getMostPopularPost() ]
+
+    return ret
+
 @app.post("/post", tags=["게시판"],
           dependencies=[Depends(JWTBearer())],
          description="게시글 작성",
@@ -410,7 +437,6 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
     author = payload['nickname']
     content = comment.content
     post_id = comment.post_id
-    title = "" # 미래에 사용할 수도 있음
 
     post_title, post_author = sql_user.getWritingInfo(str(post_id))
     author_uid = sql_user.findUidUSENickname(post_author)
@@ -424,7 +450,7 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
         log_index += 1
         
         await manager.send_event(msg, author_uid)
-        sql_user.appendComment(title, content, author, post_id)
+        sql_user.appendComment(post_title, content, author, post_id)
         comment_id = sql_user.getLastComment(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
             "comment_id": comment_id,
@@ -537,8 +563,8 @@ async def updatePost(comment_id, data: PostCommentUpdate, Authorization: Optiona
 async def kakao_callback(request: Request, code: str):
     client_id = CLIENT_ID
     client_secret = CLIENT_SECRET
-    
-    print(request.client.host, code)
+
+    print(request.client)
 
     if request.client.host == "localhost":
         redirect_uri = "http://localhost:3000/auth/kakao/callback" # localhost
@@ -589,19 +615,13 @@ async def checkJWT(Authorization: str = Header(None)):
         })
 
 @app.get('/test', tags=["test"])
-async def test(uid):
-    uid = str(uid)
-    ip: str = await firebase.get_user_ip(uid)
-    if ip[0] != 'h':
-        ip = 'http://'+ip
-    ip += 'camera' if ip[-1] == '/' else '/camera'
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(ip)
-            response.raise_for_status()
-    except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
-        return "timed out"
-    return response.text
+async def test():
+    test = {
+        "id": 10,
+        "title": "test",
+        "date": "iovajsdif"
+    }
+    return json.dumps(test)
     # keys = list(firebase.search_nickname('').keys())
     # if 'fgh' in keys:
     #     return JSONResponse(status_code=status.HTTP_226_IM_USED)
@@ -627,15 +647,15 @@ def clearfirebase(cls:Clearfirebase):
 
 #     return firebase.get_user_kakao(str(uid))
 
-@app.get("/prev-chat/{opo_user_nickname}", tags=["chatting"], dependencies=[Depends(JWTBearer())],
+@app.get("/prev-chat/{opo_user_nickname_or_uid}", tags=["chatting"], dependencies=[Depends(JWTBearer())],
          responses=res.get_previous_chat())
-def get_previous_chat_test(opo_user_nickname: str, Authorization: str = Header(None)):
+def get_previous_chat_test(opo_user_nickname_or_uid: str, Authorization: str = Header(None)):
     payload = decodeJWT(Authorization[7:])
     uid = int(payload['uid'])
     try:
-        other_uid = int(sql_user.findUidUSENickname(opo_user_nickname))
+        other_uid = int(sql_user.findUidUSENickname(opo_user_nickname_or_uid))
     except:
-        return {}
+        other_uid = opo_user_nickname_or_uid
 
     chatting_room_id = make_chatting_room_id(uid, other_uid)
     
@@ -682,6 +702,7 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
             data = await websocket.receive_text()
             data = data.split('|')
             formatted_date = data[1]
+            formatted_date = datetime.today().strftime('%m/%d %H-%M')
             data = data[0]
 
             msg = f"chat:{chatting_room_id}_{data}_{formatted_date}"
