@@ -361,3 +361,30 @@ class Responces():
                 }
             }
         }
+
+    def get_most_like(self):
+        return {
+            200: {
+                "description": "좋아요 추가/제거 성공",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                                "id": 25,
+                                "title": "test1",
+                                "nickname": "ts1",
+                                "date": "2023-06-05T13:46:36",
+                                "like": 90
+                            },
+                            {
+                                "id": 19,
+                                "title": "test7",
+                                "nickname": "ts9",
+                                "date": "2023-06-07T21:41:50",
+                                "like": 60
+                            }
+                        ]
+                    }
+                }
+            }
+        }
