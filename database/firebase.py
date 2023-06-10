@@ -141,7 +141,9 @@ class Firebase:
 
     def get_user_ip(self, uid: str) -> str:
         dir = db.reference(uid)
-        return dir.child("ip").get()
+        ip = dir.child("ip").get()
+        ip = ip if ip[0:4] == "http" else "http://" + ip
+        return ip
 
     def clear(self):
         dir = db.reference('test')
