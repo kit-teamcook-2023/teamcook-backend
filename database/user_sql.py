@@ -164,6 +164,25 @@ class UserSQL():
         return int(row[0])
 
     @healthcheck
+    def getMostPopularPost(self):
+        with self._con.cursor() as cur:
+            sql = """
+                SELECT * 
+                FROM (
+                    SELECT id, title, author, date, likes
+                    FROM writing_table.writings
+                    WHERE 
+                        `date` >= CURDATE() - INTERVAL 10 DAY 
+                    ORDER BY likes DESC, `date` DESC
+                ) T
+                WHERE likes >= 1
+                LIMIT 10;
+            """
+            cur.execute(sql)
+            row = cur.fetchall()
+        return row
+
+    @healthcheck
     def deleteWriting(self, id:int):
         # 글 삭제 시 해당 글의 댓글까지 모두 삭제. CASCADE 작동하지 않을 경우 아래의 코드 수행
         # CASCADE 정상 작동 확인. 아래 코드 필요 없음
