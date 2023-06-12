@@ -442,10 +442,16 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
         }
         msg = json.dumps(msg)
 
-        if logs[author_uid] == {}:
-            logs[author_uid] = {"comment": {post_id: [post_title, date_format]}}
-        else:
-            logs[author_uid]["comment"][post_id] = [post_title, date_format]
+        try:
+            logs[author_uid]["comment"]
+        except:
+            logs[author_uid]["comment"] = {}
+        logs[author_uid]["comment"][post_id] = [post_title, date_format]
+
+        # if logs[author_uid] == {}:
+        #     logs[author_uid] = {"comment": {post_id: [post_title, date_format]}}
+        # else:
+        #     logs[author_uid]["comment"][post_id] = [post_title, date_format]
         
         await manager.send_event(msg, author_uid)
         sql_user.appendComment(post_title, content, author, post_id)
@@ -710,10 +716,17 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
                 }
             }
             msg = json.dumps(msg)
-            if logs[opo_uid] == {}:
-                logs[opo_uid] = {"chat": {chatting_room_id: [data, formatted_date]}}
-            else:
-                logs[opo_uid]["chat"][chatting_room_id] = [data, formatted_date]
+
+            try:
+                logs[opo_uid]["chat"]
+            except:
+                logs[opo_uid]["chat"] = {}
+            logs[opo_uid]["chat"][chatting_room_id] = [data, formatted_date]
+
+            # if logs[opo_uid] == {}:
+            #     logs[opo_uid] = {"chat": {chatting_room_id: [data, formatted_date]}}
+            # else:
+            #     logs[opo_uid]["chat"][chatting_room_id] = [data, formatted_date]
 
             # 상대방에게 sse 메시지 전달
             await manager.send_event(msg, opo_uid)
@@ -787,8 +800,6 @@ async def connect(client_id: str):
             logs[client_id] = {}
 
         try:
-            print(logs[client_id])
-            print(json.dumps(logs[client_id]))
             yield f"{json.dumps(logs[client_id])}\n\n"
 
             while True:
