@@ -43,13 +43,7 @@ manager = ConnectionManager()
 backup = Backup()
 logs = backup.notification_logs
 
-try:
-    log_index = logs[0]['index']
-except:
-    log_index = 0
-
 def backup_dictionary():
-    backup.index = log_index
     backup.backup_dictionary()
 
 atexit.register(backup_dictionary)
@@ -427,27 +421,31 @@ def insertPostToMysql_user(writing: SaveWriting, Authorization: Optional[str] = 
             "status": "Post post failed"
         })
 
-log_index = 0
 @app.post("/comment", tags=["게시판"],
          description="댓글 작성",
          responses=res.post_comment())
 async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[str] = Header(None)):
-    global log_index
     payload = decodeJWT(Authorization[7:])
     author = payload['nickname']
     content = comment.content
-    post_id = comment.post_id
+    post_id = str(comment.post_id)
 
-    post_title, post_author = sql_user.getWritingInfo(str(post_id))
+    post_title, post_author = sql_user.getWritingInfo(post_id)
     author_uid = sql_user.findUidUSENickname(post_author)
 
+    date_format = datetime.today().strftime('%m/%d %H-%M')
     try:
-        msg = f"comment:{post_id}_{post_title}_{datetime.today().strftime('%m/%d %H-%M')}"
-        if logs[author_uid] is None:
-            logs[author_uid] = {"comment": {log_index : msg}}
+        msg = {
+            "comment": {
+                post_id: [post_title, date_format]
+            }
+        }
+        msg = json.dumps(msg)
+
+        if logs[author_uid] == {}:
+            logs[author_uid] = {"comment": {post_id: [post_title, date_format]}}
         else:
-            logs[author_uid]["comment"][log_index] = msg
-        log_index += 1
+            logs[author_uid]["comment"][post_id] = [post_title, date_format]
         
         await manager.send_event(msg, author_uid)
         sql_user.appendComment(post_title, content, author, post_id)
@@ -572,6 +570,7 @@ async def kakao_callback(request: Request, code: str):
         redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
 
     redirect_uri = "http://localhost:3000/auth/kakao/callback" # 임시로 고정
+    # redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
 
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
@@ -705,11 +704,16 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
             formatted_date = datetime.today().strftime('%m/%d %H-%M')
             data = data[0]
 
-            msg = f"chat:{chatting_room_id}_{data}_{formatted_date}"
-            if logs[opo_uid] is None:
-                logs[opo_uid] = {"chat": {my_uid: msg}}
+            msg = {
+                "chat": {
+                    chatting_room_id: [data, formatted_date]
+                }
+            }
+            msg = json.dumps(msg)
+            if logs[opo_uid] == {}:
+                logs[opo_uid] = {"chat": {chatting_room_id: [data, formatted_date]}}
             else:
-                logs[opo_uid]["chat"][my_uid] = msg
+                logs[opo_uid]["chat"][chatting_room_id] = [data, formatted_date]
 
             # 상대방에게 sse 메시지 전달
             await manager.send_event(msg, opo_uid)
@@ -778,25 +782,14 @@ async def connect(client_id: str):
 
     async def event_generator():
         try:
-            try:
-                chat_logs = logs[client_id]["chat"]
-                for k, v in chat_logs.items():
-                    yield f"log_id:{k}, message:{v}\n\n"
-            except:
-                pass
+            logs[client_id]
+        except:
+            logs[client_id] = {}
 
-            try:
-                comment_logs = logs[client_id]["comment"]
-                for k, v in comment_logs.items():
-                    yield f"log_id:{k}, message:{v}\n\n"
-            except:
-                pass
-
-            try:
-                del(logs[client_id])
-            except:
-                pass
-            logs[client_id] = {"comment": {}, "chat": {}}
+        try:
+            print(logs[client_id])
+            print(json.dumps(logs[client_id]))
+            yield f"{json.dumps(logs[client_id])}\n\n"
 
             while True:
                 message = await queue.get()
@@ -813,25 +806,25 @@ logs - {
         idx: <int>
         opo_uid_1: {
             "comment": {
-                "log_id1": "comment_append_str_1", 
-                "log_id2": "comment_append_str_2", 
+                "post_id1": ["comment_append_str_1", time], 
+                "post_id2": ["comment_append_str_2", time], 
                 ...
             },
             "chat": {
-                my_uid_1: "chatting_sended_str_1",
-                my_uid_2: "chatting_sended_str_2",
+                my_uid_1: ["chatting_sended_str_1", time],
+                my_uid_2: ["chatting_sended_str_2", time],
                 ...
             }
         },
         opo_uid_2: {
             "comment": [
-                "comment_append_str_1", 
-                "comment_append_str_2", 
+                "post_id1": ["comment_append_str_1", time], 
+                "post_id2": ["comment_append_str_2", time], 
                 ...
             ],
             "chat": {
-                my_uid_1: "chatting_sended_str_1",
-                my_uid_2: "chatting_sended_str_2",
+                my_uid_1: ["chatting_sended_str_1", time],
+                my_uid_2: ["chatting_sended_str_2", time],
                 ...
             }
         }
