@@ -388,3 +388,91 @@ class Responces():
                 }
             }
         }
+
+    def get_user_detail(self):
+        return {
+            200: {
+                "description": "유저의 기본 정보 반환",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                            "writing_count": 5,
+                            "comment_count": 9,
+                            "info": [
+                                    "test2",
+                                    "2023-06-13T20:49:08"
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+    def get_users_writings(self):
+        return {
+            200: {
+                "description": "유저가 쓴 글 반환",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                                "id": 32,
+                                "title": "test_from_test2",
+                                "board": "karrot",
+                                "date": "2023-06-08T16:45:33",
+                                "like": 1,
+                                "comments": 13
+                            },
+                            {
+                                "id": 4,
+                                "title": "test_from_server_3",
+                                "board": "flee",
+                                "date": "2023-05-19T23:21:43",
+                                "like": 0,
+                                "comments": 0
+                            },
+                            {
+                                "id": 3,
+                                "title": "test_from_server_2",
+                                "board": "free",
+                                "date": "2023-05-19T23:21:26",
+                                "like": 0,
+                                "comments": 0
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    def get_users_comments(self):
+        return {
+            200: {
+                "description": "유저가 쓴 댓글 반환",
+                "content": {
+                    "application/json": {
+                        "example": [
+                            {
+                                "postId": 12,
+                                "title": "admin",
+                                "comment": "gggg",
+                                "date": "2023-06-08T15:22:01"
+                            },
+                            {
+                                "postId": 12,
+                                "title": "admin",
+                                "comment": "xcvbsdfg",
+                                "date": "2023-06-08T15:13:48"
+                            },
+                            {
+                                "postId": 12,
+                                "title": "admin",
+                                "comment": "zxcv",
+                                "date": "2023-06-08T15:13:30"
+                            }
+                        ]
+                    }
+                }
+            }
+        }

@@ -23,7 +23,7 @@ import json
 import atexit
 
 from utils.responces import Responces
-from utils.models import UserSignUp, SaveWriting, Clearfirebase, Comment, OCRData, PostCommentUpdate
+from utils.models import *
 from utils.sse import ConnectionManager
 from utils.backup import Backup
 from auth.auth_handler import signJWT, decodeJWT
@@ -849,3 +849,54 @@ async def disconnect(Authorization: Optional[str] = Header(None)):
 async def send_event(client_id: str):
     await manager.send_event("Some event data", client_id)
     return {"status": "event sent"}
+
+@app.get("/user-info", tags=["사용자 정보"],
+         dependencies=[Depends(JWTBearer())],
+         description="사용자 id, 닉네임 반환",
+         responses=res.get_user_detail())
+async def get_user_signin_date(Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    nickname = payload['nickname']
+
+    ret = sql_user.getUserDetailInfo(nickname)
+    return ret
+
+@app.get("/user-posts", tags=["사용자 정보"],
+         dependencies=[Depends(JWTBearer())],
+         description="사용자가 작성한 글 반환",
+         responses=res.get_users_writings())
+async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    nickname = payload['nickname']
+
+    ret = []
+    for data in sql_user.getAllWritingsDetails(nickname, int(page)):
+        ret.append({
+            'id': data[0],
+            'title': data[1],
+            'board': data[2],
+            'date': data[3],
+            'like': data[4],
+            'comments': data[5]
+        })
+    return ret
+
+@app.get("/user-comments", tags=["사용자 정보"],
+         dependencies=[Depends(JWTBearer())],
+         description="사용자가 작성한 댓글 반환",
+         responses=res.get_users_comments())
+async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    nickname = payload['nickname']
+
+    ret = []
+    for data in sql_user.getAllCommentsDetails(nickname, int(page)):
+        ret.append({
+            'postId': data[0],
+            'title': data[1],
+            'comment': data[2],
+            'date': data[3]
+        })
+    return ret
+
+

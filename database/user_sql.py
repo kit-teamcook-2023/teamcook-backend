@@ -220,6 +220,14 @@ class UserSQL():
         return {'row_count': row[0]}
 
     @healthcheck
+    def getUsersCommentCount(self, data:str):
+        with self._con.cursor() as cur:
+            sql = f"""SELECT COUNT(*) FROM `comments` WHERE `author`='{data}'"""
+            cur.execute(sql)
+            row = cur.fetchone()
+        return row[0]
+
+    @healthcheck
     def searchWriting(self, type:str, data:str, page:int, board:str = None):
         with self._con.cursor() as cur:
             if board is None or board == "all":
@@ -366,6 +374,64 @@ class UserSQL():
             sql = f"""UPDATE `writings` SET {content} WHERE `id`='{comment_id}'"""
             cur.execute(sql)
         self._con.commit()
+
+    @healthcheck
+    def getAllWritingsDetails(self, nickname:str, page:int):
+        with self._con.cursor() as cur:
+            sql = f"""
+            SELECT w.id, w.title, w.board, w.date, w.likes, COUNT(c.id)
+            FROM 
+                (
+                    SELECT *
+                    FROM writing_table.writings
+                    WHERE author='{nickname}'
+                    LIMIT 20 OFFSET {20*page}
+                ) w
+                LEFT JOIN writing_table.comments AS c
+                ON w.id=c.writing_id
+            GROUP BY w.id
+            ORDER BY w.date DESC;
+            """
+            cur.execute(sql)
+            ret = cur.fetchall()
+        return ret
+
+    @healthcheck
+    def getAllCommentsDetails(self, nickname:str, page:int):
+        with self._con.cursor() as cur:
+            sql = f"""
+            SELECT w.id, w.title, c.content, c.date
+            FROM 
+                (
+                    SELECT * 
+                    FROM comments
+                    WHERE author='{nickname}'
+                    LIMIT 20 OFFSET {20*page}
+                ) c
+                JOIN writings AS w
+                ON c.writing_id=w.id
+            ORDER BY c.date DESC;
+            """
+            cur.execute(sql)
+            ret = cur.fetchall()
+        return ret
+
+    @healthcheck
+    def getUserDetailInfo(self, nickname:str):
+        ret = {}
+        ret['writing_count'] = self.getSearchWritingsCount('author', nickname)['row_count']
+        ret['comment_count'] = self.getUsersCommentCount(nickname)
+
+        with self._con.cursor() as cur:
+            sql = f"""
+            SELECT `nickname`, signinDate as sd 
+            FROM nicknames AS n 
+            WHERE nickname="{nickname}"
+            """
+            cur.execute(sql)
+            ret['info'] = cur.fetchone()
+
+        return ret
 
     @healthcheck
     def clearDatabase(self):
