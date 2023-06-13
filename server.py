@@ -686,11 +686,13 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
 
     op_nickname = sql_user.findNicknameUSEUid(opo_uid)
     if op_nickname is None and flag is True:
-        await websocket.send_text("400:해당 닉네임 가진 인원 없음")
+        ws_message = { 400: "해당 닉네임 가진 인원 없음" }
+        await websocket.send_text(json.dumps(ws_message))
         await websocket.close()
         return {}
 
-    await websocket.send_text("200:연결 성공")
+    ws_message = { 200: "연결 성공" }
+    await websocket.send_text(json.dumps(ws_message))
     my_nickname = sql_user.findNicknameUSEUid(my_uid)
 
     chatting_room_id = make_chatting_room_id(uid, opo_uid)
@@ -705,41 +707,33 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
         while True:
             # 클라이언트로부터 메시지 수신
             data = await websocket.receive_text()
-            data = data.split('|')
-            formatted_date = data[1]
-            formatted_date = datetime.today().strftime('%m/%d %H-%M')
-            data = data[0]
+            data = json.loads(data)
+
+            message = list(data.keys())[0]
+            formatted_date = data[message]
 
             msg = {
-                "chat": {
-                    chatting_room_id: [data, formatted_date]
-                }
+                "chat": { chatting_room_id: [message, formatted_date] }
             }
-            msg = json.dumps(msg)
 
             try:
                 logs[opo_uid]["chat"]
             except:
                 logs[opo_uid]["chat"] = {}
-            logs[opo_uid]["chat"][chatting_room_id] = [data, formatted_date]
-
-            # if logs[opo_uid] == {}:
-            #     logs[opo_uid] = {"chat": {chatting_room_id: [data, formatted_date]}}
-            # else:
-            #     logs[opo_uid]["chat"][chatting_room_id] = [data, formatted_date]
+            logs[opo_uid]["chat"][chatting_room_id] = [message, formatted_date]
 
             # 상대방에게 sse 메시지 전달
-            await manager.send_event(msg, opo_uid)
-
-            # 테스트로는 sender: data 형식으로 받아올 예정
-            # human, data = split_chatting_message(data)
+            await manager.send_event(json.dumps(msg), opo_uid)
 
             # 메시지 전송
-            send_data = f"""{my_nickname}:{data}_{formatted_date}"""
+            send_data = {
+                my_nickname: [message, formatted_date]
+            }
+            send_data = json.dumps(send_data)
             await send_message_to_chat_room(chatting_room_id, send_data, websocket)
             
             # 메시지 백업
-            sql_chat.backup_message(chatting_room_id, data, my_nickname)
+            sql_chat.backup_message(chatting_room_id, message, my_nickname)
 
     except Exception:
         # WebSocket 연결이 종료되면 사용자를 채팅방에서 제거
