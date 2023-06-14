@@ -76,3 +76,13 @@ class PostCommentUpdate(BaseModel):
                 "content": "글/댓글 내용"
             }
         }
+
+class NicknameUpdate(BaseModel):
+    nickname: str
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "nickname": "user_inputted_nickname"
+            }
+        }

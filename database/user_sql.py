@@ -45,14 +45,6 @@ class UserSQL():
             sql = f"""INSERT INTO `writings`(`title`, `content`, `author`, `board`) VALUES('{title}', '{content}', '{author}', '{board}')"""
             cur.execute(sql)
             self._con.commit()
-
-            #테스트용에서만 작동
-            sql = f"""SELECT `date` FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' ORDER BY `date` DESC"""
-            cur.execute(sql)
-
-            row = cur.fetchone()
-        return row[0].strftime("%y-%m-%d %H:%M:%S")
-
     
     # frontend 메타데이터에 writing_id를 가지고 있으면 편함
     @healthcheck
@@ -88,14 +80,23 @@ class UserSQL():
         
     @healthcheck
     def getWriting(self, title:str=None, author:str=None, time:str=None, id:int=None):
-        if id == None:
-            sql = f"""SELECT * FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
-        else:
-            sql = f"""SELECT * FROM `writings` WHERE `id`='{id}'"""
+        # if id == None:
+        #     sql = f"""SELECT * FROM (SELECT * FROM `writings` WHERE `author`='{author}') AS subquery WHERE `title`='{title}' AND `date`='{time}'"""
+        # else:
+        sql = f"""
+            SELECT w.id, w.title, w.content, n.nickname, w.date, w.board, w.likes 
+            FROM (
+                SELECT * 
+                FROM `writings` 
+                WHERE `id`='{id}'
+                ORDER BY `id` DESC
+            ) w
+            JOIN nicknames n
+            ON w.author=n.uid
+            """
         
         with self._con.cursor() as cur:
             cur.execute(sql)
-
             row = cur.fetchone()
 
         try:
@@ -105,8 +106,8 @@ class UserSQL():
                     'title': row[1],
                     'content': row[2],
                     'author': row[3],
-                    'date': row[5].strftime("%y-%m-%d %H:%M:%S"),
-                    'board': row[4],
+                    'date': row[4].strftime("%y-%m-%d %H:%M:%S"),
+                    'board': row[5],
                     'likes': row[6]
                 },
                 'parent': row[0]
@@ -132,19 +133,17 @@ class UserSQL():
     @healthcheck
     def getComments(self, parent_id):
         with self._con.cursor() as cur:
-            sql = f"""SELECT `content`, `author`, `date`, `id` FROM comments WHERE `writing_id`='{parent_id}'"""
+            sql = f"""
+                SELECT c.id, c.content, n.nickname, c.date
+                FROM (
+                        SELECT * 
+                        FROM comments 
+                        WHERE `writing_id`='{parent_id}'
+                    ) c
+                    JOIN nicknames n
+                    ON n.uid=c.author"""
             cur.execute(sql)
-            rows = cur.fetchall()
-
-        ret = []
-        for row in rows:
-            ret.append({
-                'content': row[0],
-                'author': row[1],
-                'date': row[2].strftime("%y-%m-%d %H:%M:%S"),
-                'id': row[3]
-            })
-
+            ret = cur.fetchall()
         return ret
 
     @healthcheck
@@ -167,16 +166,19 @@ class UserSQL():
     def getMostPopularPost(self):
         with self._con.cursor() as cur:
             sql = """
-                SELECT * 
+                SELECT T.id, T.title, n.nickname, T.date, T.likes
                 FROM (
                     SELECT id, title, author, date, likes
                     FROM writing_table.writings
                     WHERE 
                         `date` >= CURDATE() - INTERVAL 10 DAY 
                     ORDER BY likes DESC, `date` DESC
+                    LIMIT 10;
                 ) T
+                JOIN nicknames n
+                ON T.author=n.uid
                 WHERE likes >= 1
-                LIMIT 10;
+                ORDER BY T.likes DESC, T.date DESC
             """
             cur.execute(sql)
             row = cur.fetchall()
@@ -225,6 +227,7 @@ class UserSQL():
             sql = f"""SELECT COUNT(*) FROM `comments` WHERE `author`='{data}'"""
             cur.execute(sql)
             row = cur.fetchone()
+            print(row)
         return row[0]
 
     @healthcheck
@@ -236,23 +239,25 @@ class UserSQL():
                 sql_board = f"""AND `board`='{board}'"""
             
             if type == 'author':
-                sql = f"""SELECT `title`, `author`, `date`, `id`, `board`, `likes` FROM `writings` WHERE `{type}`='{data}' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+                sql_where = f"""WHERE `{type}`='{data}'"""
             else:
-                sql = f"""SELECT `title`, `author`, `date`, `id`, `board`, `likes` FROM `writings` WHERE `{type}` LIKE '%{data}%' {sql_board} ORDER BY `date` DESC LIMIT 20 OFFSET {page*20}"""
+                sql_where = f"""WHERE `{type}` LIKE '%{data}%'"""
+            
+            sql = f"""
+                SELECT w.id, w.title, n.nickname, w.date, w.likes, w.board
+                FROM (
+                    SELECT `id`, title, author, `date`, `likes`, board 
+                    FROM writings
+                    {sql_where} {sql_board} 
+                ) w
+                JOIN nicknames n
+                ON n.uid=w.author
+                ORDER BY w.id DESC
+                LIMIT 20 OFFSET {page*20} 
+            """
+            
             cur.execute(sql)
-            rows = cur.fetchall()
-
-        ret = []
-        # id title content author board date likes
-        for row in rows:
-            ret.append({
-                'id': row[3],
-                'title': row[0],
-                'author': row[1],
-                'date': row[2].strftime("%y-%m-%d %H:%M:%S"),
-                'likes': int(row[5]),
-                'board': row[4]
-            })
+            ret = cur.fetchall()
 
         return ret
 
@@ -340,14 +345,6 @@ class UserSQL():
                 cur.execute(sql)
 
                 sql = f"""UPDATE `writings` SET `likes`=`likes`+1 WHERE `id`='{post_id}'"""
-            # else: # 추천 취소는 없다!
-            #     if row == 0:
-            #         return False
-
-            #     sql = f"""DELETE FROM `likes` WHERE `uid`='{uid}' AND `post_id`='{post_id}'"""
-            #     cur.execute(sql)
-                
-            #     sql = f"""UPDATE `writings` SET `likes`=`likes`-1 WHERE `id`='{post_id}'"""
             cur.execute(sql)
         self._con.commit()
 
@@ -376,7 +373,7 @@ class UserSQL():
         self._con.commit()
 
     @healthcheck
-    def getAllWritingsDetails(self, nickname:str, page:int):
+    def getAllWritingsDetails(self, uid:str, page:int):
         with self._con.cursor() as cur:
             sql = f"""
             SELECT w.id, w.title, w.board, w.date, w.likes, COUNT(c.id)
@@ -384,7 +381,7 @@ class UserSQL():
                 (
                     SELECT *
                     FROM writing_table.writings
-                    WHERE author='{nickname}'
+                    WHERE author='{uid}'
                     LIMIT 20 OFFSET {20*page}
                 ) w
                 LEFT JOIN writing_table.comments AS c
@@ -397,7 +394,7 @@ class UserSQL():
         return ret
 
     @healthcheck
-    def getAllCommentsDetails(self, nickname:str, page:int):
+    def getAllCommentsDetails(self, uid:str, page:int):
         with self._con.cursor() as cur:
             sql = f"""
             SELECT w.id, w.title, c.content, c.date
@@ -405,7 +402,7 @@ class UserSQL():
                 (
                     SELECT * 
                     FROM comments
-                    WHERE author='{nickname}'
+                    WHERE author='{uid}'
                     LIMIT 20 OFFSET {20*page}
                 ) c
                 JOIN writings AS w
@@ -417,21 +414,28 @@ class UserSQL():
         return ret
 
     @healthcheck
-    def getUserDetailInfo(self, nickname:str):
+    def getUserDetailInfo(self, uid:str):
         ret = {}
-        ret['writing_count'] = self.getSearchWritingsCount('author', nickname)['row_count']
-        ret['comment_count'] = self.getUsersCommentCount(nickname)
+        ret['writing_count'] = self.getSearchWritingsCount('author', uid)['row_count']
+        ret['comment_count'] = self.getUsersCommentCount(uid)
 
         with self._con.cursor() as cur:
             sql = f"""
             SELECT `nickname`, signinDate as sd 
             FROM nicknames AS n 
-            WHERE nickname="{nickname}"
+            WHERE `uid`="{uid}"
             """
             cur.execute(sql)
             ret['info'] = cur.fetchone()
 
         return ret
+
+    @healthcheck
+    def replaceNickname(self, nickname:str, uid:str):
+        sql = f"""UPDATE nicknames SET nickname='{nickname}' WHERE `uid`='{uid}'"""
+        with self._con.cursor() as cur:
+            cur.execute(sql)
+        self._con.commit()
 
     @healthcheck
     def clearDatabase(self):

@@ -476,3 +476,37 @@ class Responces():
                 }
             }
         }
+
+    def change_nickname(self):
+        return {
+            200: {
+                "description": "변경 성공",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            'access_token': 'xxx.payload.yyy'
+                        }
+                    }
+                }
+            },
+            226: {
+                "description": "이미 사용중인 닉네임",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            
+                        }
+                    }
+                }
+            },
+            400: {
+                "description": "잘못된 요청. 현재 닉네임과 토큰의 닉네임 일치하지 않음",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            
+                        }
+                    }
+                }
+            }
+        }

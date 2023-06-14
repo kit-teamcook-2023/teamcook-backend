@@ -335,12 +335,34 @@ async def deleteAccount(Authorization: Optional[str] = Header(None)):
 # responce 추가 필요
 def searchPosts(type:str, data:str, page:int, board: Optional[str] = None):
     # print(type, data, page)
-    
-    count = sql_user.getSearchWritingsCount(type, data, board)
-    posts = sql_user.searchWriting(type, data, page, board)
+    if type == "author":
+        data = sql_user.findUidUSENickname(data)
+    try:
+        count = sql_user.getSearchWritingsCount(type, data, board)
+        posts = sql_user.searchWriting(type, data, page, board)
+
+        
+        ret = []
+        # w.id, w.title, n.nickname, w.date, w.likes, w.board
+        for row in posts:
+            ret.append({
+                'id': row[0],
+                'title': row[1],
+                'author': row[2],
+                'date': row[3].strftime("%y-%m-%d %H:%M:%S"),
+                'likes': int(row[4]),
+                'board': row[5]
+            })
+    except:
+        return JSONResponse(status_code=status.HTTP_200_BAD_REQUEST, content={
+            {
+                'post_counts': 0,
+                'posts': []
+            }
+        })
     ret = {
         'post_counts': count['row_count'],
-        'posts': posts
+        'posts': ret
     }
     return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
 
@@ -361,19 +383,25 @@ def getAllPosts(board: Optional[str] = None):
          responses=res.get_post())
 def getPostAndComments(id:int):
     ret = {}
-    result = sql_user.getWriting(id=id)
+    writing = sql_user.getWriting(id=id)
+    print(writing)
     try:
-        ret['writing'] = result['write']
-        ret['writing_id'] = result['parent']
+        ret['writing'] = writing['write']
+        ret['writing_id'] = writing['parent']
     except:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={
             "status": "Not exist post id"
         })
-        # ret['writing'] = {}
 
     try:
         result = sql_user.getComments(id)
-        ret['comments'] = result
+        comments = [{
+                'id': row[0],
+                'content': row[1],
+                'author': row[2],
+                'date': row[3].strftime("%y-%m-%d %H:%M:%S")
+            } for row in result]
+        ret['comments'] = comments
     except:
         ret['comments'] = {}
 
@@ -401,8 +429,8 @@ def getMosePopularPosts_Ten():
 def insertPostToMysql_user(writing: SaveWriting, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
 
-    # author = writing.author
-    author = payload['nickname']
+    author = payload['uid']
+    # author = payload['nickname']
     title = writing.title
     content = writing.content
     board = None
@@ -426,12 +454,12 @@ def insertPostToMysql_user(writing: SaveWriting, Authorization: Optional[str] = 
          responses=res.post_comment())
 async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
-    author = payload['nickname']
+    author = payload['uid']
+    # author = payload['nickname']
     content = comment.content
     post_id = str(comment.post_id)
 
     post_title, post_author = sql_user.getWritingInfo(post_id)
-    author_uid = sql_user.findUidUSENickname(post_author)
 
     date_format = datetime.today().strftime('%m/%d %H-%M')
     try:
@@ -443,17 +471,17 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
         msg = json.dumps(msg)
 
         try:
-            logs[author_uid]["comment"]
+            logs[post_author]["comment"]
         except:
-            logs[author_uid]["comment"] = {}
-        logs[author_uid]["comment"][post_id] = [post_title, date_format]
+            logs[post_author]["comment"] = {}
+        logs[post_author]["comment"][post_id] = [post_title, date_format]
 
-        # if logs[author_uid] == {}:
-        #     logs[author_uid] = {"comment": {post_id: [post_title, date_format]}}
+        # if logs[post_author_uid] == {}:
+        #     logs[post_author_uid] = {"comment": {post_id: [post_title, date_format]}}
         # else:
-        #     logs[author_uid]["comment"][post_id] = [post_title, date_format]
+        #     logs[post_author_uid]["comment"][post_id] = [post_title, date_format]
         
-        await manager.send_event(msg, author_uid)
+        await manager.send_event(msg, post_author)
         sql_user.appendComment(post_title, content, author, post_id)
         comment_id = sql_user.getLastComment(author)
         return JSONResponse(status_code=status.HTTP_200_OK, content={
@@ -473,7 +501,11 @@ async def insertCommentToMysql_user(comment: Comment, Authorization: Optional[st
          responses=res.delete("post"))
 def removePostFromMysql_user(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
-    # if payload['nickname'] != element.nickname:
+    # auth_nickname = sql_user.findNicknameUSEUid(payload['uid'])
+    # if auth_nickname != nickname:
+    # return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
+    #     "status": "Not allowed"
+    # })
     if payload['nickname'] != nickname:
         return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
             "status": "Not allowed"
@@ -495,6 +527,11 @@ def removePostFromMysql_user(id:int , nickname: str, Authorization: Optional[str
          responses=res.delete("comment"))
 def removeCommentFromMysql_user(id:int , nickname: str, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
+    # auth_nickname = sql_user.findNicknameUSEUid(payload['uid'])
+    # if auth_nickname != nickname:
+    #     return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
+    #         "status": "Not allowed"
+    #     })
     if payload['nickname'] != nickname:
         return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
             "status": "Not allowed"
@@ -541,6 +578,11 @@ def updatePostingLike(id:int, isLike:str, Authorization: Optional[str] = Header(
          dependencies=[Depends(JWTBearer())])
 async def updatePost(post_id, data: PostCommentUpdate, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
+    # auth_nickname = sql_user.findNicknameUSEUid(payload['uid'])
+    # if auth_nickname != nickname:
+    #     return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
+    #         "status": "Not allowed"
+    #     })
     nickname = payload['nickname']
     if data.nickname != nickname:
         return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={"status": "bad request"})
@@ -554,6 +596,11 @@ async def updatePost(post_id, data: PostCommentUpdate, Authorization: Optional[s
          dependencies=[Depends(JWTBearer())])
 async def updatePost(comment_id, data: PostCommentUpdate, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
+    # auth_nickname = sql_user.findNicknameUSEUid(payload['uid'])
+    # if auth_nickname != nickname:
+    #     return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={
+    #         "status": "Not allowed"
+    #     })
     nickname = payload['nickname']
     if data.nickname != nickname:
         return JSONResponse(status_code=status.HTTP_401_BAD_REQUEST, content={"status": "bad request"})
@@ -748,17 +795,6 @@ def make_chatting_room_id(uid: str, opo_uid: str):
     opo_uid = int(opo_uid)
     return f"""{uid}-{opo_uid}""" if uid < opo_uid else f"""{opo_uid}-{uid}"""
 
-# 채팅 구분
-def split_chatting_message(message: str):
-    temp = message.replace(" ", "").split(":")
-    if len(temp) == 1:
-        human = "testing_____"
-        data = temp[0]
-    else:
-        human, data = map(str, temp)
-    
-    return human, data
-
 # 채팅방에 사용자 추가
 def add_user_to_chat_room(room_address: str, websocket: WebSocket):
     if room_address not in active_connections:
@@ -804,7 +840,6 @@ async def connect(client_id: str):
             manager.disconnect(client_id)
 
     return EventSourceResponse(event_generator())
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 """
 logs - {
@@ -856,9 +891,7 @@ async def send_event(client_id: str):
          responses=res.get_user_detail())
 async def get_user_signin_date(Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
-    nickname = payload['nickname']
-
-    ret = sql_user.getUserDetailInfo(nickname)
+    ret = sql_user.getUserDetailInfo(payload['uid'])
     return ret
 
 @app.get("/user-posts", tags=["사용자 정보"],
@@ -867,10 +900,10 @@ async def get_user_signin_date(Authorization: Optional[str] = Header(None)):
          responses=res.get_users_writings())
 async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
-    nickname = payload['nickname']
+    uid = payload['uid']
 
     ret = []
-    for data in sql_user.getAllWritingsDetails(nickname, int(page)):
+    for data in sql_user.getAllWritingsDetails(uid, int(page)):
         ret.append({
             'id': data[0],
             'title': data[1],
@@ -887,10 +920,10 @@ async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(N
          responses=res.get_users_comments())
 async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
-    nickname = payload['nickname']
+    uid = payload['uid']
 
     ret = []
-    for data in sql_user.getAllCommentsDetails(nickname, int(page)):
+    for data in sql_user.getAllCommentsDetails(uid, int(page)):
         ret.append({
             'postId': data[0],
             'title': data[1],
@@ -899,4 +932,22 @@ async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(N
         })
     return ret
 
+@app.put("/user-info", tags=["사용자 정보"],
+         dependencies=[Depends(JWTBearer())],
+         description="닉네임 변경",
+         responses=res.change_nickname())
+async def update_users_nickname(data: NicknameUpdate, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    uid = payload['uid']
+    origin_nickname = payload['nickname']
+    nickname = data.nickname
 
+    if sql_user.searchNickname(nickname) == True:
+        return JSONResponse(status_code=status.HTTP_226_IM_USED, content={})
+
+    if payload['nickname'] != sql_user.findNicknameUSEUid(uid):
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={})
+
+    sql_user.replaceNickname(uid=uid, nickname=nickname)
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=signJWT(nickname, uid, 30 * 24 * 60 * 60))
