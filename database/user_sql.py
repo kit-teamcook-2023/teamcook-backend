@@ -166,18 +166,18 @@ class UserSQL():
     def getMostPopularPost(self):
         with self._con.cursor() as cur:
             sql = """
-                SELECT T.id, T.title, n.nickname, T.date, T.likes
+                SELECT T.id, T.title, n.nickname, T.date, T.likes, T.board
                 FROM (
-                    SELECT id, title, author, date, likes
-                    FROM writing_table.writings
+                    SELECT id, title, author, date, likes, board
+                    FROM writings
                     WHERE 
-                        `date` >= CURDATE() - INTERVAL 10 DAY 
+                        `date` >= CURDATE() - INTERVAL 10 DAY
+                        AND likes >= 1
                     ORDER BY likes DESC, `date` DESC
-                    LIMIT 10;
+                    LIMIT 10
                 ) T
                 JOIN nicknames n
                 ON T.author=n.uid
-                WHERE likes >= 1
                 ORDER BY T.likes DESC, T.date DESC
             """
             cur.execute(sql)
