@@ -81,11 +81,10 @@ async def get_gas_meter(uid: str, item: OCRData):
     uid = uid.strip()
     # OCRData일 경우에는 item.ocr_data
     # OCRData.dict() 한 경우에는 item['ocr_data']
-    item = item.dict()
-    gas_meter = item['ocr_data']
+    gas_meter = item.ocr_data
     print(uid, gas_meter)
-    # firebase.push(uid, "gas", gas_meter)
-    return JSONResponse(status_code=status.HTTP_200_OK, content=item)
+    firebase.push(uid, "gas", gas_meter)
+    return JSONResponse(status_code=status.HTTP_200_OK, content="")
 
 # @app.get("/test-for-pi", tags=["test"])
 # async def testing():
@@ -252,7 +251,7 @@ async def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
         gasmeter = int(gasmeter)
     except:
         gasmeter = 100
-    firebase.push(uid=uid, type="gas", data=['', res['gas']])
+    firebase.push(uid=uid, type="gas", data=res['gas'])
     sql_user.appendNickname(nickname, uid)
 
     # DELETE FROM nicknames WHERE nickname='test10';
@@ -417,7 +416,8 @@ def getMosePopularPosts_Ten():
             'title': x[1], 
             'author': x[2],
             'date': x[3], 
-            'likes': x[4] 
+            'likes': x[4],
+            'board': x[5]
             } for x in sql_user.getMostPopularPost() ]
 
     return ret
@@ -908,7 +908,7 @@ async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(N
             'id': data[0],
             'title': data[1],
             'board': data[2],
-            'date': data[3],
+            'date': data[3].strftime("%Y-%m-%d"),
             'like': data[4],
             'comments': data[5]
         })
@@ -921,16 +921,39 @@ async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(N
 async def get_user_signin_date(page:int, Authorization: Optional[str] = Header(None)):
     payload = decodeJWT(Authorization[7:])
     uid = payload['uid']
-
+    result = sql_user.getAllCommentsDetails(uid, int(page))
     ret = []
-    for data in sql_user.getAllCommentsDetails(uid, int(page)):
+    for data in result:
         ret.append({
             'postId': data[0],
             'title': data[1],
             'comment': data[2],
-            'date': data[3]
+            'date': data[3].strftime("%Y-%m-%d")
         })
-    return ret
+    return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
+
+@app.get("/user-page-fee", tags=["사용자 정보"],
+         dependencies=[Depends(JWTBearer())])
+async def send_user_gas_fee(Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    uid = payload['uid']
+
+    ret = {
+        1: 41910,
+        2: 31244,
+        3: 28944,
+        4: 27643,
+        5: 24055,
+        6: 1923,
+        7: 1324,
+        8: 1043,
+        9: 11324,
+        10: 14692,
+        11: 26120,
+        12: 51471
+    }
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
 
 @app.put("/user-info", tags=["사용자 정보"],
          dependencies=[Depends(JWTBearer())],
@@ -949,5 +972,6 @@ async def update_users_nickname(data: NicknameUpdate, Authorization: Optional[st
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={})
 
     sql_user.replaceNickname(uid=uid, nickname=nickname)
+    firebase.update_user(uid, nickname)
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=signJWT(nickname, uid, 30 * 24 * 60 * 60))
