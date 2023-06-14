@@ -49,6 +49,18 @@ class Firebase:
             auth.update_user(user.uid, **user_info)
         except:
             None
+        
+    def update_user(self, uid, nickname):
+        user = auth.get_user(uid)
+        print(uid)
+        user_info = {
+            'display_name': nickname,
+            'custom_claims': {
+                'provider': 'kakao',
+                'image': 'https://www.kakaocorp.com/page/favicon.ico'
+            },
+        }
+        auth.update_user(user.uid, **user_info)
 
     def delete_user(self, uid:str):
         try:
