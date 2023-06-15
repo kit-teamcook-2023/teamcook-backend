@@ -157,6 +157,10 @@ class Firebase:
         ip = ip if ip[0:4] == "http" else "http://" + ip
         return ip
 
+    def set_user_ip(self, uid: str, ip: str):
+        dir = db.reference(uid)
+        dir.child("ip").set(ip)
+
     def clear(self):
         dir = db.reference('test')
         dir.delete()

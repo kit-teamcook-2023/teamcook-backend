@@ -236,6 +236,16 @@ class Responces():
                         }
                     }
                 }
+            },
+            400: {
+                "description": "지원하지 않는 지역",
+                "content": {
+                    "application/json": {
+                        "example": {
+                            "error": "지원하지 않는 지역입니다."
+                        }
+                    }
+                }
             }
         }
 

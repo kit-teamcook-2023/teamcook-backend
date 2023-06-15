@@ -86,3 +86,13 @@ class NicknameUpdate(BaseModel):
                 "nickname": "user_inputted_nickname"
             }
         }
+
+class AddressModify(BaseModel):
+    address: str
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "address": "moved_address"
+            }
+        }

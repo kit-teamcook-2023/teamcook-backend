@@ -121,13 +121,20 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
 
     # data_now = request to raspberry pi
     ip = firebase.get_user_ip(uid)
+    if ip == "http://":
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"error": "해당 주소는 지원하지 않는 서비스입니다."})
+    
     print(ip, uid)
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=20.0) as client:
         try:
             response = await client.get(f"{ip}/ocr")
+            print('response', response)
             data = response.json()
+            print('odr-data', data['ocr_data'])
         except:
             data = {'ocr_data': 0}
+
+    print(data)
 
     data_now = {
         'gas': data['ocr_data']
@@ -154,8 +161,11 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
         cur_month = -1
 
     ret = {
-        'last_month': last_month,
-        'cur_month' : cur_month
+        "gas": {
+            'last_month': last_month,
+            'cur_month' : cur_month,
+            'predict': cur_month/hour*30
+        }
     }
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
@@ -239,7 +249,7 @@ async def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content={"signup": "ignored"})
     
     try:
-        res = await init_pi(domain, uid, "append")
+        res = await init_pi(domain, uid, "CREATE")
     except:
         res = {'gas': 300}
 
@@ -975,3 +985,39 @@ async def update_users_nickname(data: NicknameUpdate, Authorization: Optional[st
     firebase.update_user(uid, nickname)
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=signJWT(nickname, uid, 30 * 24 * 60 * 60))
+
+@app.put("/user-domain", tags=["사용자 정보"],
+         dependencies=[Depends(JWTBearer())],
+         description="주소 변경")
+async def update_users_address(data: AddressModify, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    uid = payload['uid']
+
+    domain = sql_user.getDomainFromAddress(data.address)
+    firebase.set_user_ip(uid, domain)
+
+class TestCommand(BaseModel):
+    command: str
+
+@app.post("/test-command", dependencies=[Depends(JWTBearer())])
+async def test_command_to_pi(data: TestCommand, Authorization: Optional[str] = Header(None)):
+    payload = decodeJWT(Authorization[7:])
+    uid = payload['uid']
+
+    command = data.command
+    domain = firebase.get_user_ip(uid)
+
+    data = {}
+    sub = ""
+
+    if command == "REMOVE":
+        sub = "remove"
+    elif command == "CREATE":
+        data['uid'] = uid
+        sub = "init"
+
+    print(data, json.dumps(data), sub)
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{domain}/{sub}", data=json.dumps(data))
+    return response.json()
