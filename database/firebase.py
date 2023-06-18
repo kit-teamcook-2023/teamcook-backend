@@ -129,10 +129,19 @@ class Firebase:
     def search(self, uid, month):
         data_ref = db.reference(uid)
         date_ref = data_ref.child(month)
+        try:
+            gas = int(date_ref.child('gas').get())
+        except:
+            gas = 0
+
+        try:
+            elec = int(date_ref.child('elec').get())
+        except:
+            elec = 0
 
         ret_data = {
-            'gas': date_ref.child('gas').get(),
-            'elec': date_ref.child('elec').get()
+            'gas': gas,
+            'elec': elec
         }
 
         return ret_data
