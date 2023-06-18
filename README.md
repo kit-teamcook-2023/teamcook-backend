@@ -19,6 +19,11 @@
     <a href="https://github.com/kit-teamcook-2023/teamcook-backend"><strong>Explore the frontend »</strong></a>
     <br />
     <br />
+    Gpple 디바이스 코드 보러가기
+    <br />
+    <a href="https://github.com/kit-teamcook-2023/teamcook-raspberry"><strong>Explore the device »</strong></a>
+    <br />
+    <br />
     <a href="http://34.215.66.235:8000/docs">Request Docs</a>
     ·
     <a href="https://github.com/kit-teamcook-2023/teamcook-backend/issues">Report Bug</a>
