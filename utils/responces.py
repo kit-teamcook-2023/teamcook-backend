@@ -225,13 +225,10 @@ class Responces():
                 "content": {
                     "application/json": {
                         "example": {
-                            'last_month': {
-                                'gas': '<int>',
-                                'elec': '<int>'
-                            },
-                            'cur_month' : {
-                                'gas': '<int>',
-                                'elec': '<int>'
+                            'gas': {
+                                'last_month': "int",
+                                'cur_month': "int",
+                                'predict': "int"
                             }
                         }
                     }
