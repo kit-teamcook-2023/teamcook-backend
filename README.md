@@ -1,226 +1,146 @@
-## [Swagger Docs](http://34.215.66.235:8000/docs)
+<a name="readme-top"></a>
+[![Contributors][contributors-shield]][contributors-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][forks-shield]][forks-url]
+[![stars][stars-shield]][stars-url]
+[![forks][license-shield]][license-url]
+
+<br />
+<div align="center">
+  <a href="https://github.com/kit-teamcook-2023">
+    <img src="https://github.com/kit-teamcook-2023/teamcook-front/assets/63646062/0aceb80e-5cfb-4ed2-bd77-053c2798aa06" alt="Logo" width="500" height="100">
+  </a>
+
+<h3 align="center">Gpple 가스비 측정 & 커뮤니티 앱 프론트엔드</h3>
+
+  <p align="center">
+    Gpple 프론트엔드 코드 보러가기
+    <br />
+    <a href="https://github.com/kit-teamcook-2023/teamcook-backend"><strong>Explore the frontend »</strong></a>
+    <br />
+    <br />
+    <a href="http://34.215.66.235:8000/docs">Request Docs</a>
+    ·
+    <a href="https://github.com/kit-teamcook-2023/teamcook-backend/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/kit-teamcook-2023/teamcook-backend/issues">Request Feature</a>
+  </p>
+</div>
+
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#프로젝트-소개">프로젝트 소개</a>
+      <ul>
+        <li><a href="#기술-스택">기술 스택</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#시작하기">시작하기</a>
+      <ul>
+        <li><a href="#시스템-요구사항">시스템 요구사항</a></li>
+        <li><a href="#설치">설치</a></li>
+      </ul>
+    </li>
+  </ol>
+</details>
+
+### 기술 스택
+
+[![Python][Python_b]][Python-url]
+[![FastAPI][FastAPI_b]][FastAPI-url]
+[![MySQL][MySQL_b]][MySQL-url]
+[![Firebase][Firebase_b]][Firebase-url]
+[![EC2][EC2_b]][EC2-url]
+[![Ubuntu][Ubuntu_b]][Ubuntu-url]
+
+## 시작하기
+
+### 시스템 요구사항
+* Python 3.10.6
+* Ubuntu 22.04.2 LTS
+<br>
+
+### 설치
+
+1. Clone repository
+
+```
+git clone https://github.com/kit-teamcook-2023/teamcook-backend.git
+```
+
+2. Install dependencies
+
+```
+pip install -r requirements.txt
+```
+
+3. Write your API in `.env`
+
+    - path /
+
+    ```
+    ELEC_RATE_PAGE="elec-base-url"
+
+    GAS_RATE_PAGE="gas-base-url"
+
+    CLIENT_ID="your-kakao-login-api"
+    CLIENT_SECRET="your-kakao-login-secret"
+    ```
+
+    - path /test
+
+    ```
+    MYSQL_ID="your-database-id"
+    MYSQL_PW="yout-database-password"
+    MYSQL_DB_USER="writing_table"
+    MYSQL_DB_CHAT="chatting"
+
+    FIREBASE_SDK="yout-firebase-key"
+    DB_URL="yout-firebase-realtime_database-url"
+    ```
 
-## 서버 구조
+    - path /auth
+    ```
+    secret="your-jwt-secert"
+    algorithm="jwt-algorithm"
+    ```
 
-1. 데이터베이스
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-    유저 데이터 저장 - firebase
+[contributors-shield]: https://img.shields.io/github/contributors/kit-teamcook-2023/teamcook-backend.svg?style=for-the-badge
+[contributors-url]: https://github.com/kit-teamcook-2023/teamcook-backend/graphs/contributors
 
-    글 정보 저장 - mysql 8.0.33-0ubuntu0.22.04.2
+[issues-shield]: https://img.shields.io/github/issues/kit-teamcook-2023/teamcook-backend.svg?style=for-the-badge
+[issues-url]: https://github.com/kit-teamcook-2023/teamcook-backend/issues
 
-2. WAS
+[forks-shield]: https://img.shields.io/github/forks/kit-teamcook-2023/teamcook-backend.svg?style=for-the-badge
+[forks-url]: https://github.com/kit-teamcook-2023/teamcook-backend/issues
 
-    OS - Ubuntu 22.04.2
+[stars-shield]: https://img.shields.io/github/stars/kit-teamcook-2023/teamcook-backend.svg?style=for-the-badge
+[stars-url]: https://github.com/kit-teamcook-2023/teamcook-backend/issues
 
-    framework - fastapi
+[license-shield]: https://img.shields.io/github/license/othneildrew/Best-README-Template.svg?style=for-the-badge
+[license-url]: https://github.com/othneildrew/Best-README-Template/blob/master/LICENSE.txt
 
-3. IoT 서버
 
-    docker에서 실행되는 The Things Stack 이미지 활용
+[Python_b]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
+[Python-url]: https://www.python.org/
 
+[FastAPI_b]: https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=FastAPI&logoColor=white
+[FastAPI-url]: https://fastapi.tiangolo.com/
 
+[MySQL_b]: https://img.shields.io/badge/MySQL-005C84?style=for-the-badge&logo=mysql&logoColor=white
+[MySQL-url]: https://www.mysql.com/
 
+[Firebase_b]: https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black
+[Firebase-url]: https://firebase.google.com/
 
-## 변경점
+[EC2_b]: https://img.shields.io/badge/Amazon%20EC2-232F3E?style=for-the-badge&logo=AmazonEC2
+[EC2-url]: https://aws.amazon.com/ec2/
 
-	1. 게시글 저장을 firebase에서 mysql로 변경
-
-		firebase로 저장 시 어떻게 게시글을 가져와야 할 지 모르겠음.
-
-		검색해도 자료가 부족함.
-
-		sql은 LIMIT를 이용해서 바로 가져올 수 있음
-
-	2. 닉네임을 mysql에 저장하도록 함.
-
-		2차 발표 이후 uid를 이용해서 닉네임 설정하려고 하였음.
-
-		하지만 사용자에게 닉네임을 설정하자! 라고 결정
-
-	3. frontend와 카카오 로그인 기능 구현 중 cors 오류 발생 및 redirect uri 이슈
-
-		=> cors hosts를 ["*"]로 설정. 이전에는 localhost:8000으로 설정하여 외부에서 접근 불가.
-
-		=> 카카오 redirect uri는 로그인 완료 후 로딩되는 page uri를 입력해야 함.
-
-			서버 uri를 입력해서 카카오 로그인이 제대로 되지 않았던 현상 발생.
-
-    4. 게시판별 글 불러오기가 가능하게끔 수정
-
-        database에 board 컬럼 추가하여 게시판별 검색이 가능하게끔 수정
-
-## 변경 시도
-
-    1. 크롤링 서버를 aws lambda(서버리스)로 이동
-
-		=> 크롤링하는데 3초가 넘어감... aws lambda free tier 최대가 3초라 더 늘릴 수 없음
-	
-## 진행상황
-
-	구현 완료
-
-		1. 가스요금, 전기요금 계산식 완성 및 반환 라우팅 완료
-
-		2. 유저 닉네임 중복 체크
-
-		3. 카카오 로그인 기능 추가
-
-			cors, redirect uri 이슈 해결
-
-			redirect uri : 카카오 로그인 후 되돌아가는 페이지의 uri.
-
-				서버에서 return해주는 라우팅이 없는 이상, 서버 uri로 아무리 시도해도 되지 않았음
-
-		4. 게시글, 댓글 추가 및 제거 sql 쿼리문 작성
-
-		5. jwt 토큰을 이용한 사용자 인증
-
-			글 작성, 수정 등에 사용될 예정
-
-			fastapi dependencies를 통한 토큰 검증기능 추가
-
-		6. 글 작성 시 이미지 첨부 - front-end 인원이 구현하였음
-
-			aws s3버킷을 이용하여 이미지 업로드, s3버킷의 이미지 경로를 통해 이미지를 보여줌
-
-        7. 간단하게 chatting_server를 websocket을 이용하여 구현 완료
-
-        8. 라즈베리파이와 서버 간 통신(http 이용)
-		
-        === 중간 발표 이후 ===
-
-		9. pymysql healthcheck 기능 구현
-
-            mysql의 timeout 문제가 아니었음. pymysql의 timeout의 시간이 짧아서 발생
-
-            health-checker를 이용하여 오류가 발생한 경우 기존 연결을 끊고 새로 데이터베이스에 연결하도록 설정
-
-		10. 게시글, 댓글 수정 sql 쿼리문 작성
-
-            프론트에서 제대로 작동하는지 확인 필요
-
-        11. SSE 구현
-
-            본인 글에 댓글이 작성될 때, 채팅이 올 때 알림을 보내도록 구현
-
-            프론트에서는 해당 알림을 누르면 해당 게시글 혹은 채팅방으로 이동하도록 구현 완료
-
-        12. 게시판별 검색이 가능하도록 데이터베이스 구조 변경
-
-        13. 채팅 구현 완료
-
-        14. 게시글의 이미지는 서버에서 삭제되지 않게 하게끔 합의
-		
-	구현 중
-
-
-		1. 각 api 작성 후 docs 추가
-
-            해당 사항은 fastapi 자체에서 swagger 문서 지원
-
-
-	구현 해야 할 것
-
-		1. 회원가입 시 기기와  LoRa 통신
-
-        2. firebase 구글 로그인 테스트
-
-            
-
-	수정
-
-		1. cors 오류
-
-			cors가 aws 서버의 localhost만 접근 가능하도록 되어있어 문제가 됐었음.
-
-			["*"] 로 하여 모든 ip에서 접근 가능하도록 수정
-
-        2. 게시판별 글 불러오기가 가능하게끔 수정
-
-            database에 board 컬럼 추가
-
-        
-
-## 삽질
-
-    1. socker.io는 fastapi의 websocket과 호환되지 않는다.
-
-        
-
-
-## 중간 발표 대비 내용 준비
-
-    1. 기존 개발 목표 및 일정표
-
-    2. 현재 개발 진행 상황 (기존 개발 일정표와 비교)
-
-    3. 기존 계획 대비 수정 사항
-
-    4. 데모
-
-    - 프로젝트 일부분을 직접 시연 
-
-    - 강의실에서 직접 시연이 어려운 부분은 동영상으로 시연 가능
-
-    5. 향후 개발 일정
-
-        5-1
-            채팅 기능 추가
-                websocket을 이용하여 채팅 서비스 구현 예정
-        
-        5-2
-            요금 예측 기능 추가
-                단순히 " 현재값 / 오늘까지의_일수 * 이번달_총_일수 "로 계산할 예정
-
-    6. 주요 애로사항 (해결하지 못한)
-
-        6-1
-            LoRa와 LoRa Wan을 사용하려고 하였으나, ttn console이 docker에서 돌아가지 않아 해당 기술을 사용하지 못함.
-            해당 기술은 이전에 해본 선배에게 자문을 구할 예쩡
-
-        6-2
-            
-
-    7. 해결한 애로사항 (선택사항)
-
-        - 이슈: 어떤 이슈가 발생?
-        - 문제: 무엇이 문제였는가?
-        - 어떻게 문제를 해결했는가?
-        - 문제를 해결하면서 배운점
-
-        7-1
-            카카오 로그인 시 
-            redirect uri의 작동 방식을 이해하지 못함
-            redirect uri를 서버 주소 대신 localhost로 변경. 이 이후, 웹사이트의 페이지로 잘 redirect 됨
-            공식 문서를 참고하는것이 중요하다는 것을 깨달음. 공식 문서의 각 요소가 무엇을 의미하는지 정확히 파악해야한다는 것을 깨달음
-            
-        7-2
-            fastapi를 kill 명령어로 종료하였을 때 해당 port 및 ip를 사용중이라고 뜸
-            kill 명령어를 하더라도 uvicorn 자체에서 port를 사용중이었음.
-            https://stackoverflow.com/questions/64588486/address-already-in-use-fastapi
-            kill 명령어를 쓰더라도 port를 반환하지 않는 경우가 생길 수 있다는 것을 배웠음
-
-        7-3
-            다른 ip에서 REST API를 이용하여 데이터를 요구할 때 cors 오류가 떴음. 
-            cors 설정을 localhost만 접근 가능하도록 하여 문제 발생
-            모든 ip에서 REST API를 이용할 수 있도록 cors 정책 변경
-            참고 자료에서는 cors-allow_origin을 localhost로만 하였던 것을 그대로 사용하였던 것이 문제. 공식 문서를 참고하는것이 중요하다는 것을 깨달음
-
-        7-4
-            회원가입 시 422 오류 발생
-                -> post의 gasmeter값이 str로 넘어오는 경우 422 error 발생
-                test에는 Optional으로 설정
-
-            회원가입 시 sql 에러 발생
-                -> sql에 해당 주소가 없는 경우 sql 에러 발생
-                "테스트주소1"을 집주소 더미데이터로 사용
-
-        7-5
-            sql 타임아웃으로 인해 값을 가져오지 못하는 경우 발생
-            wait_timeout이 28800초(8시간)이라 8시간이 지나면 sleep상태로 들어감
-            timeout을 30일로 늘린다면?????
-            => 근본적인 원인은 pymysql 자체의 timeout때문이었음.
-                mysql 헬스체크 기능 추가하여 해당 문제 수정
-
-    8. 기타 발표가 필요하다고 판단되는 내용 (선택사항)
-
+[Ubuntu_b]: https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=Ubuntu&logoColor=white
+[Ubuntu-url]: https://ubuntu.com/download/desktop
