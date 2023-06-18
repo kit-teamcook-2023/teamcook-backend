@@ -11,7 +11,7 @@
     <img src="https://github.com/kit-teamcook-2023/teamcook-front/assets/63646062/0aceb80e-5cfb-4ed2-bd77-053c2798aa06" alt="Logo" width="500" height="100">
   </a>
 
-<h3 align="center">Gpple 가스비 측정 & 커뮤니티 앱 프론트엔드</h3>
+<h3 align="center">Gpple 가스비 측정 & 커뮤니티 앱 백엔드</h3>
 
   <p align="center">
     Gpple 프론트엔드 코드 보러가기
