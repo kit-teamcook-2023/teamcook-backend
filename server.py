@@ -76,13 +76,12 @@ async def root(request: Request):
 
 
 # params로 fee 받아옴
-@app.post("/gas-meter/{uid}")
+@app.post("/gas-meter/{uid}", tags=["사용자 정보"])
 async def get_gas_meter(uid: str, item: OCRData):
     uid = uid.strip()
     # OCRData일 경우에는 item.ocr_data
     # OCRData.dict() 한 경우에는 item['ocr_data']
     gas_meter = item.ocr_data
-    print(uid, gas_meter)
     firebase.push(uid, "gas", gas_meter)
     return JSONResponse(status_code=status.HTTP_200_OK, content="")
 
@@ -123,21 +122,17 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
     ip = firebase.get_user_ip(uid)
     if ip == "http://":
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"error": "해당 주소는 지원하지 않는 서비스입니다."})
-    
-    print(ip, uid)
+
     async with httpx.AsyncClient(timeout=20.0) as client:
         try:
             response = await client.get(f"{ip}/ocr")
-            print('response', response)
             data = response.json()
-            print('odr-data', data['ocr_data'])
+            data['gas'] = data['gas']
         except:
-            data = {'ocr_data': 0}
-
-    print(data)
+            data = {'gas': 0}
 
     data_now = {
-        'gas': data['ocr_data']
+        'gas': int(data['gas'])
     }
 
     # 아래는 임시 데이터 적용
@@ -153,25 +148,27 @@ async def get_gas_elec(Authorization: Optional[str] = Header(None)):
     try:
         last_month = calc_fees(data_cur, data_last, rate_last)
     except:
-        last_month = -1
+        last_month = {'gas': -1}
 
     try:
         cur_month = calc_fees(data_now, data_cur, rate_cur)
     except:
-        cur_month = -1
+        cur_month = {'gas': -1}
+
+    # 원래는 predict도 해야 함
 
     ret = {
         "gas": {
-            'last_month': last_month,
-            'cur_month' : cur_month,
-            'predict': cur_month/hour*30
+            'last_month': last_month['gas'],
+            'cur_month' : cur_month['gas'],
+            'predict': int(cur_month['gas']/hour*30)
         }
     }
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
 
 def calc_fees(cur: dict, last: dict, rate:dict) -> dict:
-    gas_diff = cur['gas'] - last['gas']
+    gas_diff = cur['gas'] - last['gas'] # 로직 변경 필요. 전월 검침이 9982이고, 당월 검침이 10인 경우 예외처리 필요
     # elec_diff = cur['elec'] - last['elec']
 
     # elec_rates = list(rate['elec'].keys())
@@ -252,8 +249,6 @@ async def signup(user: UserSignUp, Authorization: Optional[str] = Header(None)):
         res = await init_pi(domain, uid, "CREATE")
     except:
         res = {'gas': 300}
-
-    print(uid)
     
     firebase.push(uid=uid, type="nickname", data=nickname)
     firebase.push(uid=uid, type="ip", data=domain)
@@ -393,7 +388,6 @@ def getAllPosts(board: Optional[str] = None):
 def getPostAndComments(id:int):
     ret = {}
     writing = sql_user.getWriting(id=id)
-    print(writing)
     try:
         ret['writing'] = writing['write']
         ret['writing_id'] = writing['parent']
@@ -416,6 +410,14 @@ def getPostAndComments(id:int):
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=ret)
 
+board_category = {
+    "karrot": "중고거래",
+    "group-buying": "공동구매",
+    "product-review": "물품리뷰",
+    "goverment": "정부정책",
+    "life-hack": "생활꿀팁"
+}
+
 @app.get("/most-like", tags=["게시판"],
         description="특정 기간 내 가장 많은 좋아요수 가진 글 보여줌",
         responses=res.get_most_like())
@@ -423,11 +425,10 @@ def getMosePopularPosts_Ten():
     # 0:id, 1:title, 2:author, 3:date, 4:like
     ret = [  {
             'id': x[0],
-            'title': x[1], 
+            'title': f"""[{board_category[x[5]]}]{x[1]}""", 
             'author': x[2],
             'date': x[3], 
             'likes': x[4],
-            'board': x[5]
             } for x in sql_user.getMostPopularPost() ]
 
     return ret
@@ -625,8 +626,6 @@ async def kakao_callback(request: Request, code: str):
     client_id = CLIENT_ID
     client_secret = CLIENT_SECRET
 
-    print(request.client)
-
     if request.client.host == "localhost":
         redirect_uri = "http://localhost:3000/auth/kakao/callback" # localhost
     else:
@@ -647,7 +646,6 @@ async def kakao_callback(request: Request, code: str):
             "redirect_uri": redirect_uri,
             "code": code
         })
-    print(response.json())
     access_token = response.json().get("access_token")
 
     # 사용자 정보 요청
@@ -658,12 +656,11 @@ async def kakao_callback(request: Request, code: str):
 
     # user_info에 있는 uid값은 int형이었다..!
     uid = str(user_info.get("id"))
-    print(user_info)
     res_code, nickname = firebase.get_user_kakao(uid)
     if res_code == True:
         return JSONResponse(status_code=status.HTTP_226_IM_USED, content=signJWT(nickname, uid, 30 * 24 * 60 * 60))
     else:
-        return JSONResponse(status_code=status.HTTP_200_OK, content=signJWT(nickname, uid, 10 * 60))
+        return JSONResponse(status_code=status.HTTP_200_OK, content=signJWT(nickname, uid, 60))
 
 @app.get("/auth/google/callback")
 async def google_callback():
@@ -797,8 +794,6 @@ async def websocket_endpoint(my_uid: str, opo_nickname_or_uid: str, websocket: W
         remove_user_from_chat_room(chatting_room_id, websocket)
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.close()
-
-    print("exited")
 
 def make_chatting_room_id(uid: str, opo_uid: str):
     uid = int(uid)
@@ -1016,8 +1011,9 @@ async def test_command_to_pi(data: TestCommand, Authorization: Optional[str] = H
         data['uid'] = uid
         sub = "init"
 
-    print(data, json.dumps(data), sub)
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(f"{domain}/{sub}", data=json.dumps(data))
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{domain}/{sub}", data=json.dumps(data))
+    except:
+        response = json.dumps({})
     return response.json()
