@@ -227,7 +227,6 @@ class UserSQL():
             sql = f"""SELECT COUNT(*) FROM `comments` WHERE `author`='{data}'"""
             cur.execute(sql)
             row = cur.fetchone()
-            print(row)
         return row[0]
 
     @healthcheck
