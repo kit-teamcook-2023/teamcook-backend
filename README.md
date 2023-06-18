@@ -115,6 +115,17 @@ pip install -r requirements.txt
     secret="your-jwt-secert"
     algorithm="jwt-algorithm"
     ```
+    
+4. Start or Stop server
+    - start
+    ```
+    sh uvicorn_start.sh
+    ```
+    
+    - end
+    ```
+    sh uvicorn_kill.sh
+    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
