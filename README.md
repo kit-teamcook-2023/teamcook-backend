@@ -116,6 +116,19 @@ pip install -r requirements.txt
     algorithm="jwt-algorithm"
     ```
 
+4. Modify kakao login redirect-url at app.get("/auth/kakao/callback")
+    
+5. Start or Stop server
+    - start
+    ```
+    sh uvicorn_start.sh
+    ```
+    
+    - end
+    ```
+    sh uvicorn_kill.sh
+    ```
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 [contributors-shield]: https://img.shields.io/github/contributors/kit-teamcook-2023/teamcook-backend.svg?style=for-the-badge
