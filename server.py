@@ -358,7 +358,7 @@ def searchPosts(type:str, data:str, page:int, board: Optional[str] = None):
                 'board': row[5]
             })
     except:
-        return JSONResponse(status_code=status.HTTP_200_BAD_REQUEST, content={
+        return JSONResponse(status_code=status.HTTP_200_OK, content={
             {
                 'post_counts': 0,
                 'posts': []
@@ -632,7 +632,7 @@ async def kakao_callback(request: Request, code: str):
         redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
 
     redirect_uri = "http://localhost:3000/auth/kakao/callback" # 임시로 고정
-    # redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
+    redirect_uri = "http://15.165.65.93/auth/kakao/callback" # 배포
 
     token_url = "https://kauth.kakao.com/oauth/token"
     user_info_url = "https://kapi.kakao.com/v2/user/me"
