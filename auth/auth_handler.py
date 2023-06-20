@@ -36,7 +36,7 @@ def decodeJWT(token: dict) -> dict:
         return None
 
 if __name__ == "__main__":
-    token = signJWT("test2", "102890172904", 30 * 24 * 60 * 60)
+    token = signJWT("admin1", "2789730723", 30 * 24 * 60 * 60)
     print(token)
     # time.sleep(3)
     print(decodeJWT(token['access_token']))
