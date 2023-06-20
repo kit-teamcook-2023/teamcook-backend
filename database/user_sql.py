@@ -41,7 +41,10 @@ class UserSQL():
         with self._con.cursor() as cur:
             if board is None:
                 board = "free"
-        
+
+            title = title.replace("'", "''")
+            content = content.replace("'", "''")
+            
             sql = f"""INSERT INTO `writings`(`title`, `content`, `author`, `board`) VALUES('{title}', '{content}', '{author}', '{board}')"""
             cur.execute(sql)
             self._con.commit()
